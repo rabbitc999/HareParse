@@ -1,0 +1,30 @@
+{
+  "name": "hareparse-grammar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DeepSeek Harness 插件：编写、检查、生成、构建并试跑 HareParse .gram 文法，覆盖 16 种生成模式与全部目标语言；内嵌 HareParse 原程序与起步模板。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin/**/*",
+    "assets/**/*",
+    "lib/**/*",
+    "skills/**/*",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/package.mjs",
+    "test": "node --test test/plugin.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

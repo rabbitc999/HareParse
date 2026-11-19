@@ -1,0 +1,293 @@
+{
+  "name": "gram-editor",
+  "displayName": "GramEditor - HareParse 文法",
+  "description": "编辑 HareParse .gram 文法；自带编译器与内嵌语言服务器，支持诊断、补全、Token 与语法树预览、一键生成解析器。",
+  "version": "1.4.4",
+  "publisher": "rabbitc999",
+  "author": {
+    "name": "小兔糖糖OvO",
+    "email": "rabbitc999@outlook.com"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Formatters"
+  ],
+  "keywords": [
+    "gram",
+    "parser",
+    "hareparse",
+    "lalr",
+    "ielr"
+  ],
+  "main": "./extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rabbitc999/HareParse"
+  },
+  "scripts": {
+    "embed": "node tools/embed-compiler.js",
+    "check": "node tools/check-manifest.js",
+    "test": "node test/smoke.js && node test/extension-smoke.js && node test/p0.js",
+    "vscode:prepublish": "node tools/embed-compiler.js",
+    "package": "node tools/package.js",
+    "package:vsce": "node tools/package-vsce.js"
+  },
+  "icon": "icon.png",
+  "activationEvents": [
+    "onLanguage:gram"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "gram",
+        "aliases": [
+          "HareParse Grammar",
+          "gram"
+        ],
+        "extensions": [
+          ".gram"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gram",
+        "scopeName": "source.gram",
+        "path": "./syntaxes/gram.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[gram]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.suggest.showWords": false,
+        "editor.formatOnSave": false,
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    },
+    "commands": [
+      {
+        "command": "gram.check",
+        "title": "Gram: 校验当前文法"
+      },
+      {
+        "command": "gram.generate",
+        "title": "Gram: 生成解析器…",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "gram.preview",
+        "title": "Gram: 预览 Token 与语法树"
+      },
+      {
+        "command": "gram.restartServer",
+        "title": "Gram: 重启语言服务器"
+      },
+      {
+        "command": "gram.openDoc",
+        "title": "Gram: 打开文法指令手册"
+      },
+      {
+        "command": "gram.generateAgain",
+        "title": "Gram: 按上次配置增量生成"
+      },
+      {
+        "command": "gram.rebuild",
+        "title": "Gram: 按上次配置强制重新生成"
+      },
+      {
+        "command": "gram.generateProfile",
+        "title": "Gram: 选择生成配置…"
+      },
+      {
+        "command": "gram.cancelGeneration",
+        "title": "Gram: 取消全部生成任务"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "gram.generate",
+          "when": "resourceLangId == gram && resourceScheme == file",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "gram.preview",
+        "key": "f7",
+        "when": "editorLangId == gram"
+      }
+    ],
+    "configuration": {
+      "title": "GramEditor",
+      "properties": {
+        "gram.lspServerPath": {
+          "type": "string",
+          "default": "",
+          "description": "【一般不用填】独立构建的 lsp-server 可执行文件路径。留空时用 HareParse 内嵌的语言服务器（HareParse lsp --stdio）。"
+        },
+        "gram.hareParsePath": {
+          "type": "string",
+          "default": "",
+          "description": "HareParse 可执行文件路径；留空时依次用仓库里的 build/bin/（开发态）、插件自带的 bin/、PATH 里的 HareParse。"
+        },
+        "gram.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "解析预览使用的 Python 3 命令或可执行文件路径；留空时依次尝试 python、python3、py -3。"
+        },
+        "gram.defaultMode": {
+          "type": "string",
+          "default": "ielr",
+          "enum": [
+            "ll1",
+            "lr0",
+            "slr",
+            "lalr",
+            "lr1",
+            "ielr",
+            "lrk",
+            "lalrk",
+            "slrk",
+            "llk",
+            "ll0",
+            "glr",
+            "earley",
+            "cyk",
+            "dd",
+            "lex"
+          ],
+          "description": "「生成解析器」对话框里默认选中的生成模式。"
+        },
+        "gram.defaultLang": {
+          "type": "string",
+          "default": "cpp17",
+          "enum": [
+            "c",
+            "cpp17",
+            "python",
+            "csharp",
+            "rust",
+            "go",
+            "java",
+            "js",
+            "lepus",
+            "gram"
+          ],
+          "description": "「生成解析器」对话框里默认选中的目标语言。"
+        },
+        "gram.traceServer": {
+          "type": "string",
+          "default": "off",
+          "enum": [
+            "off",
+            "messages"
+          ],
+          "description": "把与语言服务器的协议消息写进输出面板，排查问题时打开。"
+        },
+        "gram.incrementalGeneration": {
+          "type": "boolean",
+          "default": true,
+          "description": "生成解析器时启用持久化二进制分析缓存。"
+        },
+        "gram.cacheDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "缓存目录；相对路径以文法所属工作区为基准，留空使用输出目录下的 .hareparse-cache。"
+        },
+        "gram.generationProfiles": {
+          "type": "array",
+          "default": [],
+          "description": "可重复使用的具名生成配置；路径相对文法所属工作区。",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "mode",
+              "lang"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "ll1",
+                  "lr0",
+                  "slr",
+                  "lalr",
+                  "lr1",
+                  "ielr",
+                  "lrk",
+                  "lalrk",
+                  "slrk",
+                  "llk",
+                  "ll0",
+                  "glr",
+                  "earley",
+                  "cyk",
+                  "dd",
+                  "lex"
+                ]
+              },
+              "lang": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "cpp17",
+                  "python",
+                  "csharp",
+                  "rust",
+                  "go",
+                  "java",
+                  "js",
+                  "lepus",
+                  "gram"
+                ]
+              },
+              "outputDir": {
+                "type": "string"
+              },
+              "cacheDir": {
+                "type": "string"
+              },
+              "incremental": {
+                "type": "boolean"
+              },
+              "cppLexer": {
+                "type": "string",
+                "enum": [
+                  "std",
+                  "dfa",
+                  "vm"
+                ]
+              },
+              "strictRegex": {
+                "type": "boolean"
+              },
+              "teach": {
+                "type": "boolean"
+              },
+              "mermaid": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

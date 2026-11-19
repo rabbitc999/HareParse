@@ -1,0 +1,10 @@
+# hareparse-grammar bundle patch: one host-plane row.
+#
+# The row registers the embedded HareParse grammar skill and eight host tools
+# (write_grammar / check / generate / run / parse_text / man / dump / clear).
+# Tools registered on the host layer are inherited by every agent preset; the
+# skill lands in the global skills layer for the same reason. The plugin embeds
+# the real generator under bin/, so no toolchain path is baked into this file.
+- insert:
+    - id: hareparse
+      name: hareparse-grammar

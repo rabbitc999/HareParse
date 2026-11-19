@@ -1,0 +1,155 @@
+/* %token regex / %identifier / %commit 的正则：用标准库 <regex> 在每个
+ * 位置各做一次最长匹配（ECMAScript 语法，见 lexRegexMatch）。 */
+{% if has_unicode %}
+/** @brief 标准库字节模式或共享 Unicode 程序。 */
+struct LexRegex
+{
+    std::regex standard;
+    const PeRegexProgram *unicode = nullptr;
+};
+{% else %}using LexRegex = std::regex;
+{% endif %}
+/** @brief 选择显式 Unicode 程序，或将 (?i) 转换为标准库选项。
+ * @param pattern 正则文本。 @return 已编译规则。
+ */
+inline LexRegex lexCompileRegex(const char *pattern = "")
+{
+{% if has_unicode %}    for (const auto &entry : kLexUnicodeEntries)
+        if (std::strcmp(pattern, entry.pattern) == 0) return {std::regex(), entry.program};
+{% endif %}    bool ignoreCase = false;
+    while (std::strncmp(pattern, "(?", 2u) == 0)
+    {
+        const char *end = pattern + 2u;
+        while (*end == 'i') ++end;
+        if (end == pattern + 2u || *end != ')') break;
+        ignoreCase = true;
+        pattern = end + 1u;
+    }
+    const auto flags = std::regex_constants::ECMAScript |
+        (ignoreCase ? std::regex_constants::icase : std::regex_constants::syntax_option_type{});
+{% if has_unicode %}    return {std::regex(pattern, flags), nullptr};
+{% else %}    return std::regex(pattern, flags);
+{% endif %}}
+{% if has_regex %}/* %token regex 声明的 Token：与固定字面量一起做最长匹配 */
+inline const LexRegex kRegexRes[] =
+{
+{% for r in regex_entries %}{% if loop_first %}{% else %},
+{% endif %}    lexCompileRegex({{ r.pattern }}){% endfor %}
+};
+inline constexpr TokenType kRegexTypes[] =
+{
+{% for r in regex_entries %}{% if loop_first %}{% else %},
+{% endif %}    TOKEN_{{ r.token }}{% endfor %}
+};
+/* 每条形如 %token regex 的声明序（%commit 同长度比较用） */
+inline constexpr int kRegexOrders[] =
+{
+{% for r in regex_entries %}{% if loop_first %}{% else %},
+{% endif %}    {{ r.order }}{% endfor %}
+};
+inline constexpr std::uint32_t kRegexCount = {{ regex_count }}u;
+
+{% endif %}/* %commit 声明的片段：与 %token 一起做最长匹配；同长度时按声明序先声明优先。 */
+inline const LexRegex kCommitRes[] =
+{
+{% for c in commit_entries %}{% if loop_first %}{% else %},
+{% endif %}    lexCompileRegex({{ c.pattern }}){% endfor %}
+};
+inline constexpr const char *const kCommitTypes[][2] =
+{
+{% for c in commit_entries %}{% if loop_first %}{% else %},
+{% endif %}    {% if c.placeholder %}{% raw %}{{% endraw %} nullptr, nullptr {% raw %}}{% endraw %}{% else %}{% raw %}{{% endraw %}{{ c.type }}, {{ c.alias }}{% raw %}}{% endraw %}{% endif %}{% endfor %}
+};
+inline constexpr std::uint8_t kCommitSkips[] =
+{
+{% for c in commit_entries %}{% if loop_first %}{% else %},
+{% endif %}    {{ c.skip }}{% endfor %}
+};
+inline constexpr int kCommitOrders[] =
+{
+{% for c in commit_entries %}{% if loop_first %}{% else %},
+{% endif %}    {{ c.order }}{% endfor %}
+};
+inline constexpr std::size_t kCommitCount = {{ commit_count }}u;
+
+{% if has_identifier %}/* %identifier 声明的标识符正则 */
+inline const LexRegex kIdentifierRe = lexCompileRegex({{ identifier_pattern }});
+
+{% endif %}/**
+ * @brief 用 std::regex 从 text[pos] 起匹配，返回匹配到的字节数（0 = 不匹配）。
+ *
+ * 每条规则按 ECMAScript 的分支顺序及贪婪 / 非贪婪语义匹配；词法器再在
+ * 各条规则的结果之间取最长者。`match_continuous` 保证匹配必须从
+ * pos 起（std::regex_search 默认是往后找）。
+ * @param pattern 正则。
+ * @param text 输入文本。
+ * @param pos 起始位置。
+ * @param limits 有序运行时的可选预算，标准库路径不提供预算保证。
+ * @param result 可空的结构化结果输出。
+ * @return 匹配到的字节数（0 表示不匹配）。
+ */
+inline std::uint32_t lexRegexMatch(const LexRegex &pattern,
+                                   const ParserMemory::String &text,
+                                   std::size_t pos,
+                                   const PeRegexLimits *limits = nullptr,
+                                   PeRegexResult *result = nullptr)
+{
+    if (pos > text.size())
+    {
+        return 0u;
+    }
+{% if has_unicode %}    if (pattern.unicode != nullptr)
+    {
+        const PeRegexResult matched = PeRegexMatchEx(pattern.unicode, text.data() + pos, text.size() - pos, limits);
+        if (result != nullptr) *result = matched;
+        return matched.status == PE_REGEX_MATCH ? static_cast<std::uint32_t>(matched.byteLength) : 0u;
+    }
+    const std::regex &standard = pattern.standard;
+{% else %}    const std::regex &standard = pattern;
+{% endif %}    if (result != nullptr) *result = {};
+    (void)limits;
+    std::cmatch match;
+    const char *const pBegin = text.data() + pos;
+    const char *const pEnd = text.data() + text.size();
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+    try
+#endif
+    {
+        if (!std::regex_search(pBegin, pEnd, match, standard,
+                               std::regex_constants::match_continuous)) return 0u;
+        if (result != nullptr) {
+            result->status = PE_REGEX_MATCH;
+            result->byteLength = static_cast<std::size_t>(match.length());
+        }
+        return static_cast<std::uint32_t>(match.length());
+    }
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+    catch (const std::bad_alloc &) {
+        if (result != nullptr) result->status = PE_REGEX_NO_MEMORY;
+        return 0u;
+    } catch (const std::regex_error &error) {
+        if (result != nullptr) result->status =
+            (error.code() == std::regex_constants::error_space ||
+             error.code() == std::regex_constants::error_stack) ? PE_REGEX_NO_MEMORY : PE_REGEX_LIMIT;
+        return 0u;
+    }
+#endif
+}
+
+{% if has_identifier %}/**
+ * @brief 取最长标识符前缀长度。
+ * @param text 输入文本。
+ * @param pos 起始位置。
+ * @param limits 可选预算。
+ * @param result 可空的结构化结果输出。
+ * @return 长度（0 表示不是标识符开头）。
+ */
+inline std::uint32_t identifierLength(const ParserMemory::String &text,
+                                      std::size_t pos,
+                                   const PeRegexLimits *limits = nullptr,
+                                   PeRegexResult *result = nullptr)
+{
+    return lexRegexMatch(kIdentifierRe, text, pos, limits, result);
+}
+
+{% endif %}

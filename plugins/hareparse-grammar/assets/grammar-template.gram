@@ -1,0 +1,39 @@
+/* ============================================================
+ * HareParse 起步模板：key=value 对，值可以是数字或标识符。
+ *
+ * 直接生成并试跑：
+ *   HareParse grammar-template.gram --out-dir out --lang python
+ *   printf 'a=1,b=2' | python out/main.py
+ *
+ * 指令速查（完整清单见 hareparse_man ['directives']）：
+ *   %lang / %mode        目标语言与生成模式；命令行 --lang / --mode 优先
+ *   %start               起始非终结符；缺省第一条规则的左部
+ *   %define / %token     固定字面量；一个名字可写多个候选 "a|b"
+ *   %token regex         正则 Token（生成期编译成 DFA / 共享运行时）
+ *   %identifier          标识符怎么切；文法里用内建 VARIABLE
+ *   %trivia              匹配即丢（注释、空白标注）
+ *   %commit [类型]        收进 commits 容器，不打断解析
+ *   %space               取 Token 前跳过哪些空白；缺省 "\b" = 全部
+ *   %tree                先生成语法树，不写语义动作
+ *   %left / %right / %nonassoc / %prec   优先级与结合性
+ *   %code … %endcode     用户代码块；%epilogue / %main 追加或替换入口
+ *   %include / %copy     内联其它 .gram、把库文件拷进产物目录
+ *   %if / %elif / %else / %endif         配合 --define 做条件编译
+ * ============================================================ */
+
+%lang python          /* 快速验证用 Python；交付时可换 c / cpp17 / csharp / rust / go … */
+%mode ielr            /* 默认 IELR(1)；LL 文法写 ll1，明确要回溯写 dd */
+%start file
+
+%define EQ "="
+%define COMMA ","
+%token regex NUMBER "[0-9]+"
+%identifier "[A-Za-z_][A-Za-z0-9_]*"
+%trivia "\s*#.*"      /* 行注释：# 到行尾 */
+
+%tree                 /* 结构优先：先看 CST，再按需加语义动作 */
+
+file  := pairs;
+pairs := pairs COMMA pair | pair;
+pair  := VARIABLE EQ value;
+value := NUMBER | VARIABLE;

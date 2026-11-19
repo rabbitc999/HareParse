@@ -1,0 +1,7 @@
+{% if union_mode %}union {% if snake_case %}ParserValue{% else %}ParserValue_T{% endif %}
+{
+{{ union_body }}
+};
+{% if snake_case %}using ParserValue_T = ParserValue;
+{% endif %}{% else %}typedef {{ value_type }} ParserValue_T;
+{% endif %}

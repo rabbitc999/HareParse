@@ -1,0 +1,14 @@
+            for (std::uint32_t regexIndex = 0u; regexIndex < kRegexCount;
+                 ++regexIndex)
+            {
+                const std::uint32_t matched =
+                    lexRegexMatch(kRegexRes[regexIndex], m_text, m_textPos, &m_regexLimits, &m_regexResult);
+                if (m_regexResult.status < 0) return static_cast<Status>(m_regexResult.status);
+                if (matched > bestLength)
+                {
+                    bestLength = matched;
+                    bestType = kRegexTypes[regexIndex];
+                    bestFromRegex = true;
+                    bestOrder = kRegexOrders[regexIndex];
+                }
+            }

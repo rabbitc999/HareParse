@@ -1,0 +1,9 @@
+{
+  "name": "HareParse",
+  "file": "bin/HareParse.exe",
+  "source": "build/bin/HareParse.exe",
+  "bytes": 5920768,
+  "sha256": "863008a2025b82ba3239dc9ee950de60c8b78d2795d14d51974d1ac92b00dfda",
+  "builtAt": "2026-11-19T03:08:11.407Z",
+  "packagedAt": "2026-11-19T03:08:18.508Z"
+}

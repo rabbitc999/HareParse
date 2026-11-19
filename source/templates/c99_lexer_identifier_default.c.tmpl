@@ -1,0 +1,15 @@
+    /* C 风格标识符默认映射到 VARIABLE。 */
+    if ((isalpha((unsigned char)*pStart) != 0) || (*pStart == '_')) {
+        while ((isalnum((unsigned char)pCtx->pText[pCtx->textPosition]) != 0) ||
+               (pCtx->pText[pCtx->textPosition] == '_')) {
+            if (length + 1u >= sizeof(pCtx->lexeme)) { return PARSER_ERR_LEXER; }
+            pLexeme[length++] = Parser_ReadChar(pCtx);
+        }
+        pLexeme[length] = '\0';
+        pToken->type = TOKEN_VARIABLE;
+        pToken->pName = pLexeme;
+{% if variant_member %}
+        pToken->value.{{ variant_member }} = pLexeme;
+{% endif %}
+        return PARSER_OK;
+    }

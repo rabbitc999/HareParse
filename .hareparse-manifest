@@ -1,0 +1,7 @@
+# HareParse generated files v1
+CMakeLists.txt
+Makefile
+RESULT.md
+main.cpp
+parser.cpp
+parser.hpp

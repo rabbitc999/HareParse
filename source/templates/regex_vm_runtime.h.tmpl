@@ -1,0 +1,456 @@
+/* 有序正则运行时：C99 / C++17 均可编译，运行时不读取模板。 */
+#ifndef PE_REGEX_VM_RUNTIME_H
+#define PE_REGEX_VM_RUNTIME_H
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+/* 独立单测从同目录读取类型定义；生成产物由公开头内嵌这些定义。 */
+#ifndef PE_REGEX_LIMITS_H
+#include "regex_limits.h.tmpl"
+#endif
+#ifndef PE_REGEX_MALLOC
+#define PE_REGEX_MALLOC malloc
+#endif
+#ifndef PE_REGEX_REALLOC
+#define PE_REGEX_REALLOC realloc
+#endif
+#ifndef PE_REGEX_FREE
+#define PE_REGEX_FREE free
+#endif
+
+/** @brief 一次匹配共享的执行预算，包含所有嵌套前瞻。 */
+typedef struct PeRegexContext
+{
+    PeRegexLimits limits;
+    PeRegexResult result;
+    size_t memory, states, depth;
+} PeRegexContext;
+/** @brief 对齐的工作内存分配头。 */
+typedef union PeRegexAllocation
+{
+    size_t bytes;
+    long double alignment;
+    void *pointer;
+} PeRegexAllocation;
+
+/** @brief 初始化预算。@param ctx 执行上下文。@param limits 可空的调用方预算。 */
+static void PeRegexInit(PeRegexContext *ctx, const PeRegexLimits *limits)
+{
+    memset(ctx, 0, sizeof(*ctx));
+    if (limits != NULL) ctx->limits = *limits;
+    if (!ctx->limits.maxSteps) ctx->limits.maxSteps = 1000000u;
+    if (!ctx->limits.maxMemory) ctx->limits.maxMemory = 64u * 1024u * 1024u;
+    if (!ctx->limits.maxBacktracks) ctx->limits.maxBacktracks = 100000u;
+    if (!ctx->limits.maxStates) ctx->limits.maxStates = 100000u;
+    if (!ctx->limits.maxLookaheadDepth) ctx->limits.maxLookaheadDepth = 64u;
+}
+/** @brief 检查取消并消耗一步。@param ctx 执行上下文。@return 可以继续时为真。 */
+static int PeRegexStep(PeRegexContext *ctx)
+{
+    if (ctx->limits.cancel != NULL && ctx->limits.cancel(ctx->limits.userData))
+    { ctx->result.status = PE_REGEX_CANCELLED; return 0; }
+    if (ctx->result.steps >= ctx->limits.maxSteps)
+    { ctx->result.status = PE_REGEX_LIMIT; return 0; }
+    ++ctx->result.steps;
+    return 1;
+}
+/** @brief 分配并计入工作内存，检查乘法和加法溢出。
+ * @param ctx 上下文。@param count 数量。@param size 元素字节数。@return 分配结果。
+ */
+static void *PeRegexAlloc(PeRegexContext *ctx, size_t count, size_t size)
+{
+    size_t bytes;
+    PeRegexAllocation *allocation;
+    if (size != 0 && count > ((size_t)-1 - sizeof(PeRegexAllocation)) / size)
+    { ctx->result.status = PE_REGEX_LIMIT; return NULL; }
+    bytes = count * size + sizeof(PeRegexAllocation);
+    if (bytes > ctx->limits.maxMemory - ctx->memory)
+    { ctx->result.status = PE_REGEX_LIMIT; return NULL; }
+    allocation = (PeRegexAllocation *)PE_REGEX_MALLOC(bytes);
+    if (allocation == NULL) { ctx->result.status = PE_REGEX_NO_MEMORY; return NULL; }
+    allocation->bytes = bytes;
+    ctx->memory += bytes;
+    if (ctx->memory > ctx->result.peakMemory) ctx->result.peakMemory = ctx->memory;
+    return allocation + 1;
+}
+/** @brief 释放工作内存。@param ctx 上下文。@param pointer 可空的分配结果。 */
+static void PeRegexFree(PeRegexContext *ctx, void *pointer)
+{
+    if (pointer != NULL) {
+        PeRegexAllocation *allocation = (PeRegexAllocation *)pointer - 1;
+        ctx->memory -= allocation->bytes;
+        PE_REGEX_FREE(allocation);
+    }
+}
+/** @brief 扩容回溯栈，失败时保留原内存。
+ * @param ctx 上下文。@param pointer 旧分配。@param count 元素数。
+ * @param size 元素字节数。@return 新指针或 NULL。
+ */
+static void *PeRegexGrow(PeRegexContext *ctx, void *pointer, size_t count, size_t size)
+{
+    PeRegexAllocation *old, *grown;
+    size_t bytes, previous;
+    if (pointer == NULL) return PeRegexAlloc(ctx, count, size);
+    old = (PeRegexAllocation *)pointer - 1;
+    previous = old->bytes;
+    if (size != 0 && count > ((size_t)-1 - sizeof(PeRegexAllocation)) / size)
+    { ctx->result.status = PE_REGEX_LIMIT; return NULL; }
+    bytes = count * size + sizeof(PeRegexAllocation);
+    if (bytes > previous && bytes - previous > ctx->limits.maxMemory - ctx->memory)
+    { ctx->result.status = PE_REGEX_LIMIT; return NULL; }
+    grown = (PeRegexAllocation *)PE_REGEX_REALLOC(old, bytes);
+    if (grown == NULL) { ctx->result.status = PE_REGEX_NO_MEMORY; return NULL; }
+    grown->bytes = bytes;
+    ctx->memory = ctx->memory - previous + bytes;
+    if (ctx->memory > ctx->result.peakMemory) ctx->result.peakMemory = ctx->memory;
+    return grown + 1;
+}
+
+/** @brief 正则指令：0 接受、1 字符、2 分支、3 捕获、4/5 锚点、6 边界、
+ * 7 引用、8 前瞻、9 空循环保护。 */
+typedef struct PeRegexInst
+{
+    int op, next, other, value;
+    unsigned char bits[32];
+    size_t rangeOffset, rangeCount;
+} PeRegexInst;
+/** @brief 不可变正则程序。 */
+typedef struct PeRegexProgram
+{
+    const PeRegexInst *code;
+    size_t count, entry, groups;
+    const uint32_t *ranges;
+    int unicode;
+} PeRegexProgram;
+/** @brief 一个回溯点及其独立捕获快照。 */
+typedef struct PeRegexFrame
+{
+    size_t pc, pos;
+    size_t *state;
+} PeRegexFrame;
+/** @brief ASCII 单词字符判断。 @param ch 字节。 @return 属于单词返回真。 */
+static int PeRegexWord(unsigned char ch)
+{
+    return (ch == '_') || ((ch >= '0') && (ch <= '9')) ||
+        ((ch >= 'A') && (ch <= 'Z')) || ((ch >= 'a') && (ch <= 'z'));
+}
+/** @brief ASCII 大小写折叠。 @param ch 字节。 @return 小写形式。 */
+static unsigned char PeRegexFold(unsigned char ch)
+{
+    return ((ch >= 'A') && (ch <= 'Z')) ? (unsigned char)(ch + 32) : ch;
+}
+/** @brief 严格解码一个 UTF-8 标量值。 @param text 输入。 @param length 字节数。
+ * @param pos 起点。 @param point 输出码点。 @param next 输出下一位置。 @return 合法返回真。
+ */
+static int PeRegexDecode(const char *text, size_t length, size_t pos, uint32_t *point, size_t *next)
+{
+    uint32_t value, minimum;
+    size_t count, index;
+    unsigned char lead;
+    if (pos >= length) return 0;
+    lead = (unsigned char)text[pos];
+    if (lead < 0x80) { *point = lead; *next = pos + 1; return 1; }
+    if (lead >= 0xC2 && lead <= 0xDF) { count = 2; value = lead & 31u; minimum = 0x80; }
+    else if (lead >= 0xE0 && lead <= 0xEF) { count = 3; value = lead & 15u; minimum = 0x800; }
+    else if (lead >= 0xF0 && lead <= 0xF4) { count = 4; value = lead & 7u; minimum = 0x10000; }
+    else return 0;
+    if (count > length - pos) return 0;
+    for (index = 1; index < count; ++index)
+    {
+        const unsigned char follow = (unsigned char)text[pos + index];
+        if ((follow & 0xC0u) != 0x80u) return 0;
+        value = (value << 6) | (follow & 63u);
+    }
+    if (value < minimum || value > 0x10FFFFu || (value >= 0xD800u && value <= 0xDFFFu)) return 0;
+    *point = value; *next = pos + count;
+    return 1;
+}
+/** @brief 二分查找当前 Unicode 字符类。 @param ranges 扁平区间。
+ * @param count 区间数。 @param point 码点。 @return 包含返回真。
+ */
+static int PeRegexRanges(const uint32_t *ranges, size_t count, uint32_t point)
+{
+    size_t low = 0, high = count;
+    while (low < high)
+    {
+        const size_t middle = low + (high - low) / 2;
+        if (point < ranges[2 * middle]) high = middle;
+        else if (point > ranges[2 * middle + 1]) low = middle + 1;
+        else return 1;
+    }
+    return 0;
+}
+/** @brief 查询位置上的单词属性。 @param program 模式。 @param text 输入。
+ * @param length 长度。 @param pos 位置。 @return 单词返回一，非法 UTF-8 返回负一。
+ */
+static int PeRegexWordAt(const PeRegexProgram *program, const char *text, size_t length, size_t pos)
+{
+    uint32_t point; size_t next;
+    if (pos >= length) return 0;
+    if (!program->unicode) return PeRegexWord((unsigned char)text[pos]);
+    if (!PeRegexDecode(text, length, pos, &point, &next)) return -1;
+#ifdef PE_REGEX_UNICODE_DATA_H
+    return PeUnicodeContains(PeUnicodeWord, sizeof(PeUnicodeWord) / (2 * sizeof(uint32_t)), point);
+#else
+    return point < 128u && PeRegexWord((unsigned char)point);
+#endif
+}
+/** @brief 执行有序回溯：普通回溯使用堆栈，只有语法嵌套的前瞻递归。
+ * @param program 程序。 @param text 输入。 @param length 字节数。
+ * @param entry 子程序入口。 @param start 起点。 @param captures 捕获输入输出。
+ * @param end 成功时的结束位置。 @return 匹配成功返回 1，失败返回 0，分配失败返回 -1。
+ */
+static int PeRegexRunContext(PeRegexContext *ctx, const PeRegexProgram *program, const char *text, size_t length,
+                      size_t entry, size_t start, size_t *captures, size_t *end)
+{
+    const size_t missing = (size_t)-1;
+    const size_t captureSlots = 2 * (program->groups + 1);
+    const size_t slots = captureSlots + program->count;
+    size_t *state = (size_t *)PeRegexAlloc(ctx, slots, sizeof(size_t));
+    PeRegexFrame *stack = NULL;
+    size_t capacity = 0, top = 0, pc = entry, pos = start, index;
+    int matched = 0;
+    if (state == NULL) return -1;
+    memcpy(state, captures, captureSlots * sizeof(size_t));
+    for (index = captureSlots; index < slots; ++index) state[index] = missing;
+    for (;;)
+    {
+        const PeRegexInst *instruction;
+        if (!PeRegexStep(ctx)) { matched = -1; goto finish; }
+        if (pc >= program->count) goto backtrack;
+        instruction = &program->code[pc];
+        switch (instruction->op)
+        {
+        case 0:
+            memcpy(captures, state, captureSlots * sizeof(size_t));
+            *end = pos;
+            matched = 1;
+            goto finish;
+        case 1:
+            if (pos >= length) goto backtrack;
+            if (program->unicode)
+            {
+                uint32_t point; size_t next;
+                if (!PeRegexDecode(text, length, pos, &point, &next) ||
+                    !PeRegexRanges(program->ranges + instruction->rangeOffset, instruction->rangeCount, point)) goto backtrack;
+                pos = next;
+            }
+            else
+            {
+                const unsigned char ch = (unsigned char)text[pos];
+                if (!(instruction->bits[ch >> 3] & (1u << (ch & 7)))) goto backtrack;
+                ++pos;
+            }
+            pc = (size_t)instruction->next;
+            break;
+        case 2:
+            if (ctx->states >= ctx->limits.maxStates) {
+                ctx->result.status = PE_REGEX_LIMIT; matched = -1; goto finish;
+            }
+            if (top == capacity)
+            {
+                const size_t grownCapacity = capacity ? capacity * 2 : 16;
+                PeRegexFrame *grown;
+                if (capacity > (size_t)-1 / 2) {
+                    ctx->result.status = PE_REGEX_LIMIT; matched = -1; goto finish;
+                }
+                grown = (PeRegexFrame *)PeRegexGrow(ctx, stack, grownCapacity, sizeof(PeRegexFrame));
+                if (grown == NULL) { matched = -1; goto finish; }
+                stack = grown;
+                capacity = grownCapacity;
+            }
+            stack[top].state = (size_t *)PeRegexAlloc(ctx, slots, sizeof(size_t));
+            if (stack[top].state == NULL) { matched = -1; goto finish; }
+            memcpy(stack[top].state, state, slots * sizeof(size_t));
+            stack[top].pc = (size_t)instruction->other;
+            stack[top].pos = pos;
+            ++top;
+            ++ctx->states;
+            if (ctx->states > ctx->result.peakStates) ctx->result.peakStates = ctx->states;
+            pc = (size_t)instruction->next;
+            break;
+        case 3:
+            state[instruction->value] = pos;
+            if ((instruction->value & 1) == 0) state[instruction->value + 1] = missing;
+            pc = (size_t)instruction->next;
+            break;
+        case 4:
+            if (pos != 0) goto backtrack;
+            pc = (size_t)instruction->next;
+            break;
+        case 5:
+            if (pos != length) goto backtrack;
+            pc = (size_t)instruction->next;
+            break;
+        case 6:
+            {
+                size_t previous = pos ? pos - 1 : 0;
+                int before = 0;
+                const int after = PeRegexWordAt(program, text, length, pos);
+                if (program->unicode && pos)
+                {
+                    uint32_t point; size_t next;
+                    while (previous > 0 && (((unsigned char)text[previous] & 0xC0u) == 0x80u)) --previous;
+                    if (!PeRegexDecode(text, length, previous, &point, &next) || next != pos) goto backtrack;
+                }
+                if (pos) before = PeRegexWordAt(program, text, length, previous);
+                if (before < 0 || after < 0 || ((before != after) == instruction->value)) goto backtrack;
+            }
+            pc = (size_t)instruction->next;
+            break;
+        case 7:
+            {
+                const size_t begin = state[2 * instruction->value];
+                const size_t stop = state[2 * instruction->value + 1];
+                if ((begin == missing) || (stop == missing)) goto backtrack;
+                if (program->unicode)
+                {
+                    size_t source = begin, cursor = pos;
+                    while (source < stop)
+                    {
+                        uint32_t a, b; size_t sourceNext, cursorNext;
+                        if (!PeRegexStep(ctx)) { matched = -1; goto finish; }
+                        if (!PeRegexDecode(text, stop, source, &a, &sourceNext) ||
+                            !PeRegexDecode(text, length, cursor, &b, &cursorNext)) goto backtrack;
+                        if (instruction->other)
+                        {
+#ifdef PE_REGEX_UNICODE_DATA_H
+                            a = PeUnicodeFold(a); b = PeUnicodeFold(b);
+#else
+                            a = PeRegexFold((unsigned char)a); b = PeRegexFold((unsigned char)b);
+#endif
+                        }
+                        if (a != b) goto backtrack;
+                        source = sourceNext; cursor = cursorNext;
+                    }
+                    pos = cursor;
+                }
+                else
+                {
+                    const size_t count = stop - begin;
+                    if (count > length - pos) goto backtrack;
+                    for (index = 0; index < count; ++index)
+                    {
+                        unsigned char a, b;
+                        if (!PeRegexStep(ctx)) { matched = -1; goto finish; }
+                        a = (unsigned char)text[begin + index];
+                        b = (unsigned char)text[pos + index];
+                        if (instruction->other) { a = PeRegexFold(a); b = PeRegexFold(b); }
+                        if (a != b) goto backtrack;
+                    }
+                    pos += count;
+                }
+            }
+            pc = (size_t)instruction->next;
+            break;
+        case 8:
+            {
+                size_t ignoredEnd = pos;
+                size_t *nested = (size_t *)PeRegexAlloc(ctx, captureSlots, sizeof(size_t));
+                int found;
+                if (nested == NULL) { matched = -1; goto finish; }
+                memcpy(nested, state, captureSlots * sizeof(size_t));
+                if (ctx->depth >= ctx->limits.maxLookaheadDepth) {
+                    PeRegexFree(ctx, nested);
+                    ctx->result.status = PE_REGEX_LIMIT; matched = -1; goto finish;
+                }
+                ++ctx->depth;
+                found = PeRegexRunContext(ctx, program, text, length, (size_t)instruction->other,
+                                          pos, nested, &ignoredEnd);
+                --ctx->depth;
+                if (found < 0)
+                {
+                    PeRegexFree(ctx, nested);
+                    matched = -1;
+                    goto finish;
+                }
+                if (found && !instruction->value)
+                    memcpy(state, nested, captureSlots * sizeof(size_t));
+                PeRegexFree(ctx, nested);
+                if (found == instruction->value) goto backtrack;
+            }
+            pc = (size_t)instruction->next;
+            break;
+        case 9:
+            if (state[captureSlots + pc] == pos) goto backtrack;
+            state[captureSlots + pc] = pos;
+            pc = (size_t)instruction->next;
+            break;
+        default: goto backtrack;
+        }
+        continue;
+backtrack:
+        if (top == 0) break;
+        if (ctx->result.backtracks >= ctx->limits.maxBacktracks) {
+            ctx->result.status = PE_REGEX_LIMIT; matched = -1; goto finish;
+        }
+        ++ctx->result.backtracks;
+        --ctx->states;
+        PeRegexFree(ctx, state);
+        --top;
+        state = stack[top].state;
+        pc = stack[top].pc;
+        pos = stack[top].pos;
+    }
+finish:
+    PeRegexFree(ctx, state);
+    while (top) { PeRegexFree(ctx, stack[--top].state); --ctx->states; }
+    PeRegexFree(ctx, stack);
+    return matched;
+}
+/** @brief 从指定入口执行，兼容旧的捕获测试接口。
+ * @param program 程序。@param text 输入。@param length 字节数。@param entry 入口。
+ * @param start 起点。@param captures 捕获。@param end 成功时终点。
+ * @return 成功为一，无匹配为零，资源错误为负一。
+ */
+static inline int PeRegexRun(const PeRegexProgram *program, const char *text, size_t length,
+                            size_t entry, size_t start, size_t *captures, size_t *end)
+{
+    PeRegexContext ctx;
+    PeRegexInit(&ctx, NULL);
+    return PeRegexRunContext(&ctx, program, text, length, entry, start, captures, end);
+}
+
+/** @brief 结构化前缀匹配，所有前瞻共享预算，所有退出路径释放工作内存。
+ * @param program 已校验的不可变程序。@param text 输入。@param length 输入字节数。
+ * @param limits 预算，NULL 使用默认。@return 匹配状态、字节长度和执行统计。
+ */
+static PeRegexResult PeRegexMatchEx(const PeRegexProgram *program, const char *text,
+                                   size_t length, const PeRegexLimits *limits)
+{
+    PeRegexContext ctx;
+    size_t slots, index, end = 0;
+    size_t *captures;
+    int found;
+    PeRegexInit(&ctx, limits);
+    if (!PeRegexStep(&ctx)) return ctx.result;
+    if (program->groups > ((size_t)-1 / 2) - 1 ||
+        program->count > (size_t)-1 - 2 * (program->groups + 1)) {
+        ctx.result.status = PE_REGEX_LIMIT; return ctx.result;
+    }
+    slots = 2 * (program->groups + 1);
+    captures = (size_t *)PeRegexAlloc(&ctx, slots, sizeof(size_t));
+    if (captures == NULL) return ctx.result;
+    for (index = 0; index < slots; ++index) captures[index] = (size_t)-1;
+    found = PeRegexRunContext(&ctx, program, text, length, program->entry, 0, captures, &end);
+    PeRegexFree(&ctx, captures);
+    if (found >= 0) {
+        ctx.result.status = found ? PE_REGEX_MATCH : PE_REGEX_NO_MATCH;
+        ctx.result.byteLength = found ? end : 0;
+    }
+    return ctx.result;
+}
+/** @brief 兼容长度接口；需要区分失败原因时使用 PeRegexMatchEx。
+ * @param program 程序。@param text 输入。@param length 字节数。@return 接受前缀字节数。
+ */
+static uint32_t PeRegexMatchLength(const PeRegexProgram *program, const char *text, size_t length)
+{
+    const PeRegexResult result = PeRegexMatchEx(program, text, length, NULL);
+    return result.status == PE_REGEX_MATCH ? (uint32_t)result.byteLength : 0;
+}
+/** @brief 匹配以 NUL 结束的文本。@param program 程序。@param text 输入。@return 字节数。 */
+static inline uint32_t PeRegexMatch(const PeRegexProgram *program, const char *text)
+{
+    return PeRegexMatchLength(program, text, strlen(text));
+}
+#endif

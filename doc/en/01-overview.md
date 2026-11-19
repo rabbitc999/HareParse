@@ -1,0 +1,64 @@
+# 01 Repository Documentation Overview
+
+> This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../../doc/README.md)。
+
+> **Lepus's glorious history**: This language grew up in this repository in its early days — the generator, StackVM, standard library, glue and reflection were all polished together here. It has since been split into an independent repository at <https://github.com/rabbitc999/Lepus>; links to `lepus/` in this document now point to the corresponding documents in the new repository.
+>
+> **The RustView line**: It likewise grew up in this repository — the minimal Rust grammar, borrow analysis and zero-dependency SVG / HTML all took their final shape here. It has since been split into an independent repository at <https://github.com/rabbitc999/rust-view>; links to `rust-view/` in this document now point to the corresponding documents in the new repository.
+
+This page describes where documentation across the HareParse repository lives. The repository's main entry is the [root README](../../README.md); the generator, Lepus, MetroLang and RustView each have their own project documentation.
+
+## Independent Projects
+
+| Project | Documentation | Content |
+| --- | --- | --- |
+| HareParse parser generator | [Usage entry](../../source/README.md) · [Topic document index](../README.md) | `.gram` grammar, analysis modes, eight target languages, output artifacts and implementation |
+| Lepus | [Language entry](https://github.com/rabbitc999/Lepus/blob/master/README.md) · [EBNF grammar reference](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md) · [Topic documents](https://github.com/rabbitc999/Lepus/blob/master/doc/README.md) · Lepus exporter | Language syntax baseline, standard library, StackVM, glue and export |
+| MetroLang | [Toolchain entry](https://github.com/rabbitc999/metro-lang/blob/master/README.md) · [Language reference](https://github.com/rabbitc999/metro-lang/blob/master/doc/01-metrolang-reference.md) · [JSON format](https://github.com/rabbitc999/metro-lang/blob/master/doc/02-json-format.md) · [Interactive viewer](https://github.com/rabbitc999/metro-lang/blob/master/map_view/README.md) | A metro network data language: grammar, compilation / decompilation, SVG maps and route queries (**independent repository**) |
+| RustView | [Project entry](https://github.com/rabbitc999/rust-view/blob/master/README.md) · [Preview page and demo](https://github.com/rabbitc999/rust-view/blob/master/doc/preview.html) · [Grammar](https://github.com/rabbitc999/rust-view/blob/master/rust_subset.gram) | Borrow-semantics visualization for minimal Rust pseudocode: HareParse-generated frontend, scope stack + borrow state table analysis, hand-written SVG / HTML; **1.0 feature freeze** (**independent repository**) |
+
+## Parser Generator Documentation
+
+The generator's implementation and manual live in this directory alongside the rest of the repository's documents; the numbering is in the table below.
+
+| No. | Document | Content |
+| --- | --- | --- |
+| 03 | [Architecture](../03-architecture.md) | Modules and data flow of the generator |
+| 05 | [Grammar](../05-grammar.md) | The `.gram` specification and validation |
+| 06 | [Analysis](../06-analysis.md) | Algorithms such as LL, LR and IELR |
+| 07 | [Code Generation](../07-codegen.md) | Templates and language backends |
+| 08 | [Generated Code](../08-generated-code.md) | Artifact structure and APIs |
+| 09 | [Build and Test](../09-build-and-test.md) | Generator build, template rebuild and regression |
+| 10 | [Example Grammars](../10-examples.md) | A guided tour of the `example/` grammars |
+| 11 | [Project Examples](../11-project-examples.md) | A guided tour of the `project/` projects |
+| 12 | [Grammar Usage Manual](../12-grammar-usage.md) | Directives and semantic actions |
+| 13 | [Generation Modes](../13-modes.md) | Sixteen analysis and generation modes |
+| 14 | [Target Languages and Output Artifacts](../14-languages-and-products.md) | Backend selection and artifact forms |
+| 15 | [Support Matrix](../15-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
+| 16 | [Tri-language, Embedded Assets and Release](../16-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+
+## Other Projects and Tools
+
+| Category | Documentation |
+| --- | --- |
+| Example projects | [project main entry](../../project/README.md) · [course lab experiments](../../project/lab_report_nju/README.md) |
+| Standalone libraries | [library directory](../../library/); each library maintains its own `README.md` and technical reports |
+| Editor | [VS Code extension](../../vscode/README.md) |
+| Documentation maintenance | [unified conventions, templates and documentation generator](../../project/document/README.md) |
+| Repository collaboration | [handover notes](../../AGENTS.md) · [grammar AI plugin](../../plugins/hareparse-grammar/README.md) |
+| Cross-project narratives | [02 Max-Level Grammar](../02-gram-legend.md) · [04 One .gram, Eight Languages](../04-hareparse-story.md) |
+
+When changing any project, defer to that project's source, tests and local documentation; for the unified scope of the parser's languages and modes, see the [support matrix](../15-language-mode-support.md).
+
+## Custom Allocator Library
+
+[`library/allocator`](../../library/allocator/README.md) provides a linked-list pool, a linear pool and C++17 container adapters, under the namespace `Memory`. Build artifacts live in `build/allocator/`.
+
+## Lepus Binary Stream Parsing
+
+`std::binary::BinaryReader` reads little/big-endian primitive numbers, fixed-length strings and arrays through C++ glue.
+
+## Lepus JSON and TOML
+
+The JSON/TOML parsing interfaces plug copies of `library/json` and `library/toml` into Lepus, providing parsing, nested reads, traversal, diagnostics and serialization.
+

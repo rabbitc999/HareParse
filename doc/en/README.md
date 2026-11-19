@@ -1,0 +1,163 @@
+# Repository Documentation
+
+The [Lepus backend reference](../17-lepus-backend.md) describes native `.lep` output,
+LL(1), SLR(1), LALR(1), LR(1), IELR(1), APIs and current limitations.
+
+> This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../../doc/README.md)。
+
+> **Lepus's glorious history**: This language grew up in this repository in its early days — the generator, StackVM, standard library, glue and reflection were all polished together here (the Lepus documents below are the record of that era). It has since been split into an independent repository at <https://github.com/rabbitc999/Lepus>; links to `lepus/` in this document now point to the corresponding documents in the new repository.
+
+HareParse's [tri-language display, embedded assets and release notes](../16-i18n-and-packaging.md) cover `--ui-lang`, the `man` and `lsp` subcommands, the console and pipes, and the standalone packaging scripts for the two tools.
+
+For the Lepus 1.0.0 name, the `.lep` project layout and the Chinese/English/Japanese language selection, see [Lepus naming and tri-language notes](https://github.com/rabbitc999/Lepus/blob/master/doc/37-name-freeze.md).
+Lepus's [documentation index](https://github.com/rabbitc999/Lepus/blob/master/doc/README.md) walks through things step by step with official example source, expected output and error boundaries. Beginners start from [08 first programs](https://github.com/rabbitc999/Lepus/blob/master/doc/01-quickstart.md); specialized environments and acceptance scope are in [28 sample verification](https://github.com/rabbitc999/Lepus/blob/master/doc/11-algorithm-validation.md).
+
+
+For reference sources and lexical lifetime checking, see [04 references and iteration](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md); the dedicated regression is `tests/lepus_reference_escape.py`.
+
+For the `T &` default read-only reference, see [reference syntax sugar](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md); for panic on unassigned regions, custom heap range checks and AOT default unchecked / explicit checked, see [23 memory allocator](https://github.com/rabbitc999/Lepus/blob/master/doc/20-memory-allocator.md); the dedicated tests are `tests/lepus_reference_sugar.py` and `tests/lepus_memory_guard.py`.
+
+For cross-feature combinations of references with generics, enums, callbacks, iterators, interfaces and Drop, see [reference_combinations.lep](https://github.com/rabbitc999/Lepus/blob/master/example/samples/reference_combinations.lep); the dedicated regression is `tests/lepus_reference_combinations.py`, covering normal interpretation / AOT and illegal-escape diagnostics.
+
+Start from [01 repository documentation overview](../01-overview.md). This directory is the **sole entry point for all repository documentation**: repository-wide navigation, cross-project notes, and the manual and implementation documents of the HareParse parser generator all live here.
+
+| Document | Content |
+| --- | --- |
+| [01 Repository Documentation Overview](../01-overview.md) | Entry point to all projects, additional libraries and all documents |
+| [02 Max-Level Grammar](../02-gram-legend.md) | A fictional side story spanning the parser, Lepus and course experiments, continuing Lepus 1.0, iteration chains and multi-database acceptance |
+| [03 Architecture](../03-architecture.md) | Modules, data flow and code conventions of the generator |
+| [04 One .gram, Eight Languages](../04-hareparse-story.md) | The evolution story of the HareParse generator |
+| [05 Grammar](../05-grammar.md) | The `.gram` syntax specification and generation-time validation |
+| [06 Analysis](../06-analysis.md) | Algorithms such as LL, LR and IELR |
+| [07 Code Generation](../07-codegen.md) | Template system and language backends |
+| [08 Generated Code](../08-generated-code.md) | Inventory of output artifacts and APIs |
+| [09 Build and Test](../09-build-and-test.md) | Generator build, template rebuild and regression |
+| [09 Sealed Side Story](../09-extra.md) | Paragraphs removed from 02, sealed as "grammar is the key"; speak the seal phrase and the repository's parser generator unseals it |
+| [10 Example Grammars](../10-examples.md) | A guided tour of `example/` |
+| [11 Project Examples](../11-project-examples.md) | A guided tour of `project/` |
+| [12 Grammar Usage Manual](../12-grammar-usage.md) | Directives, semantic actions and error recovery |
+| [13 Generation Modes](../13-modes.md) | Sixteen generation modes and the runtimes |
+| [14 Target Languages and Output Artifacts](../14-languages-and-products.md) | Backend selection and artifact forms |
+| [15 Support Matrix](../15-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
+| [16 Tri-language, Embedded Assets and Release](../16-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+| [Lepus EBNF Grammar Reference](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md) | Current lexical specification, all productions, anonymous function types, generic entry points and semantic-check boundaries |
+| [Lepus Language Philosophy](https://github.com/rabbitc999/Lepus/blob/master/doc/03-core-concepts.md) | Write simply, run everywhere; value semantics, explicit references, resource management and no move semantics |
+| [Documentation Maintenance Guidelines](../../project/document/README.md) | Unified conventions, technical document templates, documentation generator and sync checks |
+
+> The `09` pages (build and test, sealed side story) have no English edition yet; the entries above
+> link to the Chinese originals. Pages without an English edition are always linked to their Chinese
+> source rather than to a partial translation.
+
+## mc Connecting to External Databases
+
+Lepus ships standard library modules for MySQL, SQLite, PostgreSQL and Microsoft SQL Server / ODBC,
+`std::sql`, host glue `glue/std_sql.hpp`,
+and a [student information management example project](https://github.com/rabbitc999/Lepus/blob/master/example/students-server/README.md) inside the Lepus project; the retained table creation / initial data /
+query SQL lives in `lepus/sql-lepus/sql/`. For the library's unified entry point and backend selection see
+[19 SQL databases](https://github.com/rabbitc999/Lepus/blob/master/doc/33-reflection-serialization-sql.md); for detailed interfaces see the sql-lepus interface reference.
+
+## mc Connecting to External Networks
+
+[18 TCP and minimal HTTP](https://github.com/rabbitc999/Lepus/blob/master/doc/07-stdlib-overview.md): standard library modules
+`std::net` and host glue `glue/std_net.hpp`
+provide `TcpSocket` / `TcpListener` (connection timeouts, line reading) and `HttpClient` (GET / POST,
+`parseUrl` / `buildRequest` / `parseResponse`); the deterministic sample is
+[`lepus/example/samples/std_net.lep`](https://github.com/rabbitc999/Lepus/blob/master/example/samples/std_net.lep).
+
+For Lepus's postfix generic declarations, function and callback type inference, and enum variant shorthand, see the generics and collections document.
+
+For Lepus's `ExplicitConvert<T>` / `ImplicitConvert<T>`, explicit selection rules and ownership of conversion results, see the type conversion interfaces.
+
+## mc Collection Literals and Key Protocols
+
+The generics and collections document describes Set `{a,b,c}`, Map `{key:value,...}`, empty-collection context inference, custom-key `Equal<bool,T>` and the optional `Hash<T>`.
+
+## mc Value Semantics and Ownership
+
+Lepus supports `static T new(...)` as a construction entry point: self is provided automatically, an owning value is returned, discarding the result is forbidden; the default declaration remains legal. Macro temporary variables support `$0`–`$9`.
+
+03 Value semantics and chained calls: strings / containers / big numbers and structs are all value types (`String a = b;` copies rather than aliases); the compiler manages intermediate values of chained calls such as `f().g()` through internal temporaries, automatically destructing them, releasing resources and clearing internal slots once the full expression ends, keeping the final value and the borrowed sources it needs, and documenting the related fixes and regressions; for iteration chains see
+05 standard iterators.
+
+For Lepus's two-tier incremental cache, shared dependency validation and limitations, see the [deployment document](https://github.com/rabbitc999/Lepus/blob/master/doc/06-deployment.md).
+
+## Unified Build Directory
+
+<!-- docgen:build-summary:start -->
+The build entry point is `build.sh`; the actual steps are maintained by `build-all.sh`. Use Git Bash on Windows; use a POSIX shell on Linux/macOS. The scripts build HareParse, libraries and example projects (Lepus, MetroLang and RustView have been split into independent repositories) and do not run tests; those independent repositories are not in the unified build manifest.
+
+```sh
+sh build.sh                  # 全量构建
+sh build.sh --list           # 检测环境并显示清单，不执行构建
+sh build.sh -q               # 安静模式，完整输出仍写入日志
+sh clear.sh --dry-run        # 预览清理范围
+sh clear.sh                 # 清理构建产物
+```
+
+Files produced by the build entry point live under the repository-root `build/`. The generator is in `build/bin/` (release in `build/bin/release/`), Rust in `build/rust/<library name>/`, example projects in `build/project/<project name>/`, logs in `build/build-all/logs/`, and full example artifacts in `build/build-all/examples/`. Lepus, MetroLang and RustView have been split into independent repositories, with build artifacts in their own repositories.
+
+The build entry actually runs `python3`, `python`, picking an available Python 3 interpreter and skipping unusable placeholder programs and Python 2; the detection result is passed to the generator, and `PYTHON` can be used to override the choice. A C/C++ compiler, make and Python 3 are required tools; when the Rust, .NET or Go toolchains are missing, the corresponding parts are skipped.
+
+Cleanup is limited to Git-ignored artifacts inside the root `build/`, keeping version-controlled files, untracked-but-not-ignored files and nested Git repositories. Cleanup is refused when `tmp/build.lock` is detected; artifacts left behind by old versions in other directories are out of scope.
+
+The paths above apply to the repository's unified build entry point. When running a subproject's Makefile, generation scripts or test tools directly, follow the paths in that project's documentation.
+
+When maintaining this section, edit the [unified configuration](../../project/document/documentation.json) or the [build summary template](../../project/document/templates/build-summary.md.tmpl), then run the documentation generator. For template usage, see the [Documentation Maintenance Guidelines](../../project/document/README.md).
+<!-- docgen:build-summary:end -->
+
+## Custom Allocator Library
+
+[`library/allocator`](../../library/allocator/README.md) provides a linked-list pool, a linear pool and C++17 container adapters, under the namespace `Memory`. Build artifacts live in `build/allocator/`.
+
+## Lepus Binary Stream Parsing
+
+`std::binary::BinaryReader` reads little/big-endian primitive numbers, fixed-length strings and arrays through C++ glue.
+The core lang IEEE 754 bidirectional interface converts between float32/float64 and four/eight-byte lists and arrays.
+
+## Lepus JSON and TOML
+
+The JSON/TOML parsing interfaces plug copies of `library/json` and `library/toml` into Lepus, providing parsing, nested reads, traversal, diagnostics and serialization.
+
+[Lepus references and iteration](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md): non-null references, default dereferencing, read-only conversion, string / big-number / collection / dictionary / tuple references, single-byte character reads and writes, read-only method checking, list element write-back and the P1 three-backend regression.
+
+[Lepus library migration and regression validation](https://github.com/rabbitc999/Lepus/blob/master/doc/11-algorithm-validation.md): entry points for the standard library, robot, GUI, car and turtle tests.
+
+For Lepus's unnamed variable-length symbol table, the lepus/CLI switches, measured space savings and reverse-engineering cost, see the [symbol compaction document](https://github.com/rabbitc999/Lepus/blob/master/doc/16-compact-symbols.md).
+
+Lepus PC bytecode encryption: standalone OpenSSL tools, key management and integrity acceptance.
+
+[Lepus optional panic call stacks](https://github.com/rabbitc999/Lepus/blob/master/doc/18-panic-trace.md): diagnostics strategy when macros are trimmed and symbols are hidden.
+
+Lepus line-level debugging covers macro bodies, include and submodule origins; see [panic and source line numbers](https://github.com/rabbitc999/Lepus/blob/master/doc/18-panic-trace.md).
+
+[Lepus tuple read-only reference regression](https://github.com/rabbitc999/Lepus/blob/master/example/samples/p2_tuple_readonly.lep): read-only references to tuple elements and nested origins, whole-value replacement and independent copies; for the semantics see [04 references and iteration](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md).
+
+Lepus standard iterators: lazy chained adapters, list reference iteration, ownership transfer and consuming operations.
+
+Lepus imports and name resolution describes library name shorthand without `using`, user declarations taking priority, and disambiguation of same-named imports.
+
+For Lepus annotations and reflection — compile-time annotations, `@Reflect` automatic metadata generation, Lepus typed queries and all forms of call bridging, three-backend end-to-end acceptance and performance reports, implementation scope, the default-off switch and artifact compatibility rules — see 30 annotations and reflection.
+
+For Lepus's type and memory audit fixes, `loop` owned-value exits and borrowed returns, plus the three-backend regression, see values and resources.
+
+Lepus creating a new application project (lepus new)
+
+[Lepus short scene directives and running dropped-in files](https://github.com/rabbitc999/Lepus/blob/master/doc/09-toolchain.md).
+
+For Lepus operator ownership and early-exit tests, see 09 values and resources.
+
+Lepus Web student information management system: real HTTP, SQLite, browser pages and three-backend acceptance.
+
+Lepus keeps only AOT and `.svmb` compilation artifacts and removes the embedded VM export. See the exporter notes and [scene directives](https://github.com/rabbitc999/Lepus/blob/master/doc/09-toolchain.md).
+
+Lepus's lambda and function-pointer callbacks support iterator chains and callback signature inference, support independent by-value captured environments, and reject reference captures and captures of resources lacking a safe copy protocol; for the full sample see [lambda_callbacks.lep](https://github.com/rabbitc999/Lepus/blob/master/example/samples/lambda_callbacks.lep).
+
+Lepus recursion and nested ownership: local aggregates, reference slots, arrays, function values and interface combinations; the [calculator tool-chain example](https://github.com/rabbitc999/Lepus/blob/master/example/calculator/README.md) includes both flat and nested ASTs.
+
+[Custom error messages for all eight targets](../19-custom-error-messages.md) and [regex runtime budgets](../20-regex-runtime-budgets.md) (Chinese).
+
+[Regex compatibility reports and validation without writing output](../21-regex-compatibility.md) (Chinese).
+
+[Binary incremental generation and C++11 subset tests](../22-incremental-generation.md) (Chinese).
+
+[VS Code large-grammar editing, incremental generation and workspace rename](../23-vscode-workflow.md) (Chinese).
