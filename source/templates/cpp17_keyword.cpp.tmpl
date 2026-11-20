@@ -1,15 +1,16 @@
 {% if has_keywords %}/// 关键字表项。
 struct Keyword
 {
-    const char *text; ///< 字面量
-    TokenType type;   ///< 对应的 Token
+    const char *text;      ///< 字面量
+    TokenType type;        ///< 对应的 Token
+    std::size_t length;    ///< 字面量字节数，先比长度再 strcmp
 };
 
 /// 关键字表：%define / %token 里像标识符的字面量。
 inline constexpr Keyword kKeywords[] =
 {
 {% for k in keywords %}{% if loop_first %}{% else %},
-{% endif %}    { {{ k.text }}, {{ k.token }} }{% endfor %}
+{% endif %}    { {{ k.text }}, {{ k.token }}, sizeof({{ k.text }}) - 1u }{% endfor %}
 };
 
 /**
@@ -23,12 +24,14 @@ inline TokenType keywordType(const char *pText)
     {
         return TokenType::TOKEN_INVALID;
     }
+    const std::size_t length = std::strlen(pText);
     for (const Keyword &entry : kKeywords)
     {
-        if (std::strcmp(pText, entry.text) == 0)
+        if ((entry.length != length) || (std::strcmp(pText, entry.text) != 0))
         {
-            return entry.type;
+            continue;
         }
+        return entry.type;
     }
     return TokenType::TOKEN_INVALID;
 }

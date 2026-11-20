@@ -8,6 +8,10 @@
     {
         if (!rule.wildcard)
         {
+            if (pText[0] != rule.text[0])
+            {
+                return false;
+            }
             return std::strncmp(pText, rule.text, rule.length) == 0;
         }
         for (std::uint32_t index = 0u; index < rule.length; ++index)

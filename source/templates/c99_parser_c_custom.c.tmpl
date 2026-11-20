@@ -117,7 +117,9 @@ static int32_t Parser_CommitAppend(const ParserToken_T *pToken,
 {
 {% if post_tokens %}    Parser_FreeBatch();
 {% endif %}
-    PARSER_MEMSET(s_ParserErrors, 0, sizeof(s_ParserErrors));
+    /* 读取端只访问 [0, count)；count == 0 时 GetLastError 借用 0 号槽位，
+       所以只需把 0 号清成全零，不必每次 memset 整张错误表。 */
+    PARSER_MEMSET(&s_ParserErrors[0], 0, sizeof(s_ParserErrors[0]));
     s_ParserErrorCount = 0u;
 #ifdef PARSER_HAS_REGEX_RUNTIME
     Parser_ResetRegexResult();

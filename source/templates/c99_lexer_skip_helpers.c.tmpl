@@ -16,6 +16,9 @@ static int32_t Parser_LexRuleHit(const ParserLexRule_T *pRule, const char *pText
 {
     uint32_t index = 0u;
     if (pRule->wildcard == 0u) {
+        if (pText[0] != pRule->pText[0]) {
+            return 0;
+        }
         return (strncmp(pText, pRule->pText, pRule->length) == 0) ? 1 : 0;
     }
     for (index = 0u; index < pRule->length; index++) {

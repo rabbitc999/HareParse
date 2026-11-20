@@ -11,13 +11,14 @@ typedef struct ParserKeyword_T
 {
     const char *pText;
     ParserTokenType_T type;
+    uint32_t length;
 } ParserKeyword_T;
 
 #define PARSER_KEYWORD_COUNT {{ keyword_count }}u
 {{ static_prefix }}const ParserKeyword_T s_ParserKeywords[] =
 {
 {% for keyword in keywords %}{% if loop_first %}{% else %},
-{% endif %}    { {{ keyword.text }}, TOKEN_{{ keyword.token }} }{% endfor %}
+{% endif %}    { {{ keyword.text }}, TOKEN_{{ keyword.token }}, sizeof({{ keyword.text }}) - 1u }{% endfor %}
 };
 
 /** @brief 关键字查表。 @param pText 文本。
@@ -25,11 +26,15 @@ typedef struct ParserKeyword_T
 ParserTokenType_T Parser_TokenKeyword(const char *pText)
 {
     uint32_t index = 0u;
+    uint32_t length = 0u;
     if (pText == NULL) { return TOKEN_INVALID; }
+    length = (uint32_t)strlen(pText);
     for (index = 0u; index < PARSER_KEYWORD_COUNT; index++) {
-        if (strcmp(pText, s_ParserKeywords[index].pText) == 0) {
-            return s_ParserKeywords[index].type;
+        if ((s_ParserKeywords[index].length != length) ||
+            (strcmp(pText, s_ParserKeywords[index].pText) != 0)) {
+            continue;
         }
+        return s_ParserKeywords[index].type;
     }
     return TOKEN_INVALID;
 }

@@ -18,8 +18,13 @@ static int32_t Parser_LRPush(ParserLRStack_T *pStack, uint16_t state,
     pStack->symbols[pStack->top] = symbol;
     pStack->values[pStack->top] = value;
     if (pName != NULL) {
-        snprintf(pStack->names[pStack->top],
-                 sizeof(pStack->names[pStack->top]), "%s", pName);
+        size_t nameLength = strlen(pName);
+        char *pDestination = pStack->names[pStack->top];
+        if (nameLength >= sizeof(pStack->names[pStack->top])) {
+            nameLength = sizeof(pStack->names[pStack->top]) - 1u;
+        }
+        memcpy(pDestination, pName, nameLength);
+        pDestination[nameLength] = '\0';
     } else {
         pStack->names[pStack->top][0] = '\0';
     }
@@ -545,8 +550,10 @@ static int32_t Parser_ParseLoopLR(ParserCtx_T *pCtx, ParserValue_T *pOut{% if tr
     ParserLRStack_T stack;
     ParserValue_T initialValue;
 {% if tree %}    uint8_t treeMode = 0u;
-{% endif %}    PARSER_MEMSET(&stack, 0, sizeof(stack));
-    PARSER_MEMSET(&initialValue, 0, sizeof(initialValue));
+{% endif %}    stack.top = 0u;
+{% if tree %}    /* 只有树节点需要预清零：其余槽位由 Parser_LRPush 逐项写入。 */
+    PARSER_MEMSET(stack.nodes, 0, sizeof(stack.nodes));
+{% endif %}    PARSER_MEMSET(&initialValue, 0, sizeof(initialValue));
 {% if tree %}    if (ppTree != NULL) { *ppTree = NULL; treeMode = 1u; }
 {% endif %}    if (Parser_LRPush(&stack, 0u, PARSER_INVALID_INDEX, initialValue, NULL)
         != PARSER_OK) {

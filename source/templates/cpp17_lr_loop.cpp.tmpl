@@ -119,7 +119,7 @@
         {
             stack.nodes[stack.top - 1u] = makeLeaf(m_current);
         }
-        if (!treeMode)
+        if ((!treeMode) && (m_lrIncrementalCache != nullptr))
         {
             lrRecordIncrementalPoint(stack);
         }
@@ -437,7 +437,7 @@
                    bool treeMode = false)
     {
         LrStack &stack = m_lrStack;
-        stack = LrStack();
+        stack.reset();
 {% if has_destructors %}        struct DiscardGuard
         {
             LrStack *pStack;
@@ -644,7 +644,7 @@
     void restoreCheckpoint(const LrStackCheckpoint &checkpoint)
     {
         LrStack &stack = m_lrStack;
-        stack = LrStack();
+        stack.reset();
         stack.top = checkpoint.top;
         stack.states = checkpoint.states;
         stack.symbols = checkpoint.symbols;
