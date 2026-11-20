@@ -937,6 +937,30 @@ std::string pyChartTables(const AnalysisResult &analysis)
         binaryLeft.push_back(rule[1]);
         binaryRight.push_back(rule[2]);
     }
+    // 生成期索引：Earley predictor 按非终结符查产生式，CYK 按 Token 查
+    // 终结符规则，把运行时的全表线性扫描降为直接查表。
+    std::vector<std::vector<long long>> byLhs(
+        static_cast<std::size_t>(chart.nontermCount));
+    for (std::size_t prod = 0; prod < chart.lhs.size(); ++prod)
+    {
+        byLhs[static_cast<std::size_t>(chart.lhs[prod])].push_back(
+            static_cast<long long>(prod));
+    }
+    std::vector<std::vector<long long>> unaryByToken(
+        static_cast<std::size_t>(chart.terminalCount));
+    for (std::size_t rule = 0; rule < unaryToken.size(); ++rule)
+    {
+        unaryByToken[static_cast<std::size_t>(unaryToken[rule])].push_back(
+            static_cast<long long>(rule));
+    }
+    // CYK 按左部非终结符查二元规则：每个 (左部, 右部) 判定不必扫描整表。
+    std::vector<std::vector<long long>> binaryByLeft(
+        static_cast<std::size_t>(chart.nontermCount));
+    for (std::size_t rule = 0; rule < binaryLeft.size(); ++rule)
+    {
+        binaryByLeft[static_cast<std::size_t>(binaryLeft[rule])].push_back(
+            static_cast<long long>(rule));
+    }
     const auto list = [&](const std::vector<int> &items)
     { return pyIntList(asLong(items), "    ", 16u); };
     return tmpl::renderValues(
@@ -954,7 +978,10 @@ std::string pyChartTables(const AnalysisResult &analysis)
          {"unary_token", list(unaryToken)},
          {"binary_lhs", list(binaryLhs)},
          {"binary_left", list(binaryLeft)},
-         {"binary_right", list(binaryRight)}});
+         {"binary_right", list(binaryRight)},
+         {"by_lhs", pyIntRows(byLhs, "")},
+         {"unary_by_token", pyIntRows(unaryByToken, "")},
+         {"by_left", pyIntRows(binaryByLeft, "")}});
 }
 
 /* ---------------- 词法表 ---------------- */

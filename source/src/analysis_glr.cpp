@@ -22,9 +22,12 @@
 #include "HareParse/analysis_lr_fast.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "HareParse/analysis_internal.hpp"
@@ -43,16 +46,14 @@ namespace
 using GlrCellKey = std::pair<int, std::string>;
 
 /**
- * @brief 往候选动作列表里追加一个动作（去重，保持插入顺序）。
- * @param list 候选动作列表。
- * @param action 新增动作。
+ * @brief 把动作压成整数，供候选集合去重（避免反复比较 LrAction）。
+ * @param action 动作。
+ * @return 整数编码；种类占高位，值占低位。
  */
-void addUniqueAction(std::vector<LrAction> &list, const LrAction &action)
+int encodeGlrAction(const LrAction &action)
 {
-    if (std::find(list.begin(), list.end(), action) == list.end())
-    {
-        list.push_back(action);
-    }
+    return (static_cast<int>(action.kind) << 30) |
+           (action.value & 0x3fffffff);
 }
 
 /**
@@ -142,52 +143,147 @@ bool Analysis::glrAnalyze(const Grammar &grammar,
     const auto productionIds = slrProductionIds(rules);
     std::set<std::string> terminalSet(result.terminals.begin(),
                                       result.terminals.end());
-    std::map<std::string, int> nontermIds;
+    std::unordered_map<std::string, int> nontermIds;
     for (std::size_t index = 0; index < result.nonterms.size(); ++index)
     {
         nontermIds[result.nonterms[index]] = static_cast<int>(index);
     }
-    std::map<GlrCellKey, std::vector<LrAction>> cells;
+    // Token 编号按字典序分配，保证整数键的遍历顺序与原字符串键一致。
+    std::vector<std::string> tokenNames(result.terminals.begin(),
+                                        result.terminals.end());
+    std::sort(tokenNames.begin(), tokenNames.end());
+    const int tokenCount = static_cast<int>(tokenNames.size());
+    std::unordered_map<std::string, int> tokenIds;
+    for (std::size_t index = 0; index < tokenNames.size(); ++index)
+    {
+        tokenIds[tokenNames[index]] = static_cast<int>(index);
+    }
+    // 预解 rhs 与出边：把字符串键的查表改成整数键，消除热循环里的
+    // 字符串比较与临时 pair 构造。
+    std::vector<std::vector<const std::vector<std::string> *>> rhsByProd(
+        result.nonterms.size());
+    std::vector<std::vector<int>> prodIdByNt(result.nonterms.size());
+    for (const auto &rule : rules)
+    {
+        const auto ntIt = nontermIds.find(rule.first);
+        if (ntIt == nontermIds.end())
+        {
+            continue;
+        }
+        auto &slot = rhsByProd[static_cast<std::size_t>(ntIt->second)];
+        auto &ids = prodIdByNt[static_cast<std::size_t>(ntIt->second)];
+        slot.resize(rule.second.size());
+        ids.resize(rule.second.size(), -1);
+        for (std::size_t prod = 0; prod < rule.second.size(); ++prod)
+        {
+            slot[prod] = &rule.second[prod].rhs;
+            const auto idIt = productionIds.find(std::make_pair(rule.first,
+                                                                static_cast<int>(prod)));
+            if (idIt != productionIds.end())
+            {
+                ids[prod] = idIt->second;
+            }
+        }
+    }
+    // 转移表用 (状态, Token) 整数键，避免热循环里的字符串 pair 查找。
+    std::unordered_map<long long, int> transitionsById;
+    for (const auto &entry : transitions)
+    {
+        const auto tokIt = tokenIds.find(entry.first.second);
+        if (tokIt != tokenIds.end())
+        {
+            transitionsById[static_cast<long long>(entry.first.first) *
+                                tokenCount +
+                            tokIt->second] = entry.second;
+        }
+    }
+    // 候选动作按整数 cell 收集；整数编码去重替代线性查找 LrAction。
+    std::unordered_map<long long, std::size_t> cellIndex;
+    std::vector<std::pair<int, int>> cellCoords;
+    std::vector<std::vector<LrAction>> cellActions;
+    std::vector<std::unordered_set<int>> cellSeen;
+    const auto cellFor = [&](int state, int token) -> std::size_t
+    {
+        const long long key =
+            static_cast<long long>(state) * tokenCount + token;
+        const auto found = cellIndex.find(key);
+        if (found != cellIndex.end())
+        {
+            return found->second;
+        }
+        const std::size_t id = cellActions.size();
+        cellIndex.emplace(key, id);
+        cellCoords.emplace_back(state, token);
+        cellActions.emplace_back();
+        cellSeen.emplace_back();
+        return id;
+    };
+    const auto addUnique = [&](int state, int token, const LrAction &action)
+    {
+        const std::size_t id = cellFor(state, token);
+        if (cellSeen[id].insert(encodeGlrAction(action)).second)
+        {
+            cellActions[id].push_back(action);
+        }
+    };
     for (std::size_t stateId = 0; stateId < states.size(); ++stateId)
     {
         for (const auto &entry : states[stateId].items)
         {
             const LrItem &item = entry.first;
-            const std::vector<std::string> &rhs =
-                rules.at(item.lhs)[static_cast<std::size_t>(item.prod)].rhs;
-            if (static_cast<std::size_t>(item.dot) < rhs.size())
+            const auto ntIt = nontermIds.find(item.lhs);
+            const std::vector<std::string> *rhsPtr = nullptr;
+            const int *prodIdPtr = nullptr;
+            if (ntIt != nontermIds.end())
+            {
+                const std::size_t nt = static_cast<std::size_t>(ntIt->second);
+                if (static_cast<std::size_t>(item.prod) < rhsByProd[nt].size())
+                {
+                    rhsPtr = rhsByProd[nt][static_cast<std::size_t>(item.prod)];
+                    if (prodIdByNt[nt][static_cast<std::size_t>(item.prod)] >= 0)
+                    {
+                        prodIdPtr =
+                            &prodIdByNt[nt][static_cast<std::size_t>(item.prod)];
+                    }
+                }
+            }
+            if ((rhsPtr != nullptr) &&
+                static_cast<std::size_t>(item.dot) < rhsPtr->size())
             {
                 const std::string &symbol =
-                    rhs[static_cast<std::size_t>(item.dot)];
-                if (terminalSet.count(symbol))
+                    (*rhsPtr)[static_cast<std::size_t>(item.dot)];
+                const auto tokIt = tokenIds.find(symbol);
+                if (tokIt != tokenIds.end())
                 {
-                    const auto found = transitions.find(std::make_pair(
-                        static_cast<int>(stateId), symbol));
-                    if (found != transitions.end())
+                    const long long key =
+                        static_cast<long long>(stateId) * tokenCount +
+                        tokIt->second;
+                    const auto found = transitionsById.find(key);
+                    if (found != transitionsById.end())
                     {
-                        addUniqueAction(
-                            cells[std::make_pair(static_cast<int>(stateId),
-                                                 symbol)],
-                            {LrAction::Kind::Shift, found->second});
+                        addUnique(static_cast<int>(stateId), tokIt->second,
+                                  {LrAction::Kind::Shift, found->second});
                     }
                 }
                 continue;
             }
             if (item.lhs == start)
             {
-                addUniqueAction(
-                    cells[std::make_pair(static_cast<int>(stateId), "END")],
-                    {LrAction::Kind::Accept, 0});
+                addUnique(static_cast<int>(stateId), tokenIds.at("END"),
+                          {LrAction::Kind::Accept, 0});
                 continue;
             }
-            const auto prodIdIt = productionIds.find(std::make_pair(item.lhs, item.prod));
-            const int *prodId =
-                prodIdIt != productionIds.end() ? &prodIdIt->second : nullptr;
-            for (const std::string &token : entry.second)
+            if (prodIdPtr != nullptr)
             {
-                addUniqueAction(
-                    cells[std::make_pair(static_cast<int>(stateId), token)],
-                    {LrAction::Kind::Reduce, *prodId});
+                for (const std::string &token : entry.second)
+                {
+                    const auto tokIt = tokenIds.find(token);
+                    if (tokIt != tokenIds.end())
+                    {
+                        addUnique(static_cast<int>(stateId), tokIt->second,
+                                  {LrAction::Kind::Reduce, *prodIdPtr});
+                    }
+                }
             }
         }
     }
@@ -204,11 +300,12 @@ bool Analysis::glrAnalyze(const Grammar &grammar,
             productionPriority[*id] = entry.second;
         }
     }
-    for (auto &entry : cells)
+    for (std::size_t cell = 0; cell < cellActions.size(); ++cell)
     {
-        const int stateId = entry.first.first;
-        const std::string &token = entry.first.second;
-        std::vector<LrAction> &list = entry.second;
+        const int stateId = cellCoords[cell].first;
+        const std::string token =
+            tokenNames[static_cast<std::size_t>(cellCoords[cell].second)];
+        std::vector<LrAction> &list = cellActions[cell];
         int shiftIndex = -1;
         for (std::size_t index = 0; index < list.size(); ++index)
         {
@@ -275,30 +372,33 @@ bool Analysis::glrAnalyze(const Grammar &grammar,
     }
 
     // 4. 写表：单动作单元直接写 action，多动作单元额外记候选列表。
-    for (const auto &entry : cells)
+    for (std::size_t cell = 0; cell < cellActions.size(); ++cell)
     {
-        if (entry.second.empty())
+        if (cellActions[cell].empty())
         {
             continue;
         }
-        std::vector<LrAction> list = entry.second;
+        std::vector<LrAction> list = cellActions[cell];
         orderActions(list);
-        result.action[entry.first] = list.front();
+        const std::pair<int, std::string> cellKey = std::make_pair(
+            cellCoords[cell].first,
+            tokenNames[static_cast<std::size_t>(cellCoords[cell].second)]);
+        result.action[cellKey] = list.front();
         if (list.size() <= 1)
         {
             continue;
         }
-        result.glrAlternatives[entry.first] = list;
+        result.glrAlternatives[cellKey] = list;
         const std::string kind = slrConflictText(list[0], list[1]);
         LrConflict conflict;
         conflict.kind = kind;
-        conflict.state = entry.first.first;
-        conflict.token = entry.first.second;
+        conflict.state = cellCoords[cell].first;
+        conflict.token = cellKey.second;
         conflict.text =
-            "GLR 冲突（状态 " + std::to_string(entry.first.first) +
-            "，Token " + entry.first.second + "）：" + kind + "；候选动作 [" +
+            "GLR 冲突（状态 " + std::to_string(cellCoords[cell].first) +
+            "，Token " + cellKey.second + "）：" + kind + "；候选动作 [" +
             actionListText(list, rules, productionIds) + "]；涉及项集 " +
-            lalrStateText(states[static_cast<std::size_t>(entry.first.first)],
+            lalrStateText(states[static_cast<std::size_t>(cellCoords[cell].first)],
                           rules) +
             "；已保留到 GSS 运行时";
         result.unresolved.push_back(conflict);

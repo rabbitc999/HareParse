@@ -23,7 +23,9 @@
             self._glr_node_ids[index] = []
             self._glr_node_of[index] = {}
         self._glr_work = []
+        self._glr_head = 0
         self._glr_queued = []
+        self._glr_edge_index = []
         self._glr_names = []
         self._glr_path_visits = 0
         self._glr_path_edges = [_INVALID_INDEX] * _MAX_PATH_DEPTH
@@ -37,6 +39,7 @@
         if index >= _INVALID_INDEX:
             return _INVALID_INDEX
         self._glr_nodes.append(_GlrNode(state))
+        self._glr_edge_index.append(set())
         self._glr_queued.append(False)
         self._glr_node_of[pos][state] = index
         self._glr_node_ids[pos].append(index)
@@ -48,17 +51,19 @@
             return left is right
         return left.to_string() == right.to_string()
 
+    def _glr_edge_key(self, from_node, symbol, production, tree, compare_tree):
+        """归约/移进边的去重键；树模式下把树的结构串一起算进去。"""
+        key = (from_node, symbol, production)
+        if compare_tree:
+            key += (tree.to_string() if tree is not None else None,)
+        return key
+
     def _glr_edge_exists(self, target, from_node, symbol, production,
                          tree=None, compare_tree=False):
         """目标节点上是否已经有这条归约边（路径合并的判定）。"""
-        for edge_id in self._glr_nodes[target].edges:
-            edge = self._glr_edges[edge_id]
-            if ((edge.from_node == from_node) and (edge.symbol == symbol) and
-                    (edge.production == production) and
-                    ((not compare_tree) or
-                     self._glr_tree_equal(edge.tree, tree))):
-                return True
-        return False
+        return (self._glr_edge_key(from_node, symbol, production, tree,
+                                   compare_tree)
+                in self._glr_edge_index[target])
 
     def _glr_add_edge(self, target, from_node, symbol, production, name_slot,
                       value, tree, merge_existing=True, compare_tree=False):
@@ -81,6 +86,9 @@
         edge.tree = tree
         self._glr_edges.append(edge)
         self._glr_nodes[target].edges.append(len(self._glr_edges) - 1)
+        self._glr_edge_index[target].add(
+            self._glr_edge_key(from_node, symbol, production, tree,
+                               compare_tree))
         return 1
 
     def _glr_queue(self, node):
@@ -89,10 +97,15 @@
             return
         self._glr_queued[node] = True
         self._glr_work.append(node)
+        # 游标推进后顺手压缩，避免工作表单次解析无限增长。
+        if self._glr_head > 64 and self._glr_head * 2 > len(self._glr_work):
+            self._glr_work = self._glr_work[self._glr_head:]
+            self._glr_head = 0
 
     def _glr_dequeue(self):
-        """从工作表取出一个节点。"""
-        node = self._glr_work.pop(0)
+        """从工作表取出一个节点（游标推进，避免 pop(0) 的线性搬移）。"""
+        node = self._glr_work[self._glr_head]
+        self._glr_head += 1
         self._glr_queued[node] = False
         return node
 
@@ -213,6 +226,11 @@
     def _glr_shift_round(self, cur, nxt, token, tree_mode):
         """把本轮所有活跃节点在 Token 上移进，生成下一轮节点。"""
         node_ids = list(self._glr_node_ids[cur])
+        # 同一个 Token 的语义值、名字槽与叶子对所有活跃节点相同，只算一次。
+        current = self._current
+        value = current.value
+        name_slot = self._glr_store_name(current.text)
+        leaf = _make_leaf(current) if tree_mode else None
         for node in node_ids:
             state = self._glr_nodes[node].state
             if state >= _STATE_COUNT:
@@ -227,9 +245,6 @@
                 if action <= 0:
                     continue
                 target = action - 1
-                value = self._current.value
-                name_slot = self._glr_store_name(self._current.text)
-                leaf = _make_leaf(self._current) if tree_mode else None
                 created = self._glr_node_for(nxt, target)
                 if created == _INVALID_INDEX:
                     return STATUS_ERR_STACK
@@ -299,7 +314,7 @@
         self._glr_queue(start_node)
         while True:
             token = self._current.type
-            while self._glr_work:
+            while self._glr_head < len(self._glr_work):
                 node = self._glr_dequeue()
                 status = self._glr_reduce_node(cur, node, token, tree_mode)
                 if status != STATUS_OK:
@@ -308,6 +323,9 @@
                                     "{{ lr_name }} GLR 归约失败")
                     self._glr_clear_results()
                     return status
+            # 本轮归约已全部出队，下一轮会重新入队；游标与队列一并复位。
+            self._glr_work = []
+            self._glr_head = 0
             if self._current.type == TOKEN_END:
                 for node in list(self._glr_node_ids[cur]):
                     status = self._glr_accept_node(node)

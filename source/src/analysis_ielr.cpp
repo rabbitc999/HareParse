@@ -29,6 +29,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <unordered_set>
 #include <vector>
 
 #include "HareParse/analysis_internal.hpp"
@@ -45,6 +46,75 @@ namespace
 
 /// 规则表简写。
 using RuleMap = std::map<std::string, std::vector<Production>>;
+/// LR(0) 项到整数编号的映射；编号顺序与 LrItem 字典序一致。
+using CoreIds = std::map<LrItem, int>;
+
+bool isCompleteItem(const LrItem &item, const RuleMap &rules);
+
+/**
+ * @brief 按规则表顺序给 LR(0) 项编号（与快速 LR 自动机的 core 编号一致）。
+ * @param rules 增广文法规则表。
+ * @return 项到编号的映射。
+ */
+CoreIds buildCoreIds(const RuleMap &rules)
+{
+    CoreIds ids;
+    for (const auto &rule : rules)
+    {
+        for (std::size_t prod = 0; prod < rule.second.size(); ++prod)
+        {
+            const std::size_t length = rule.second[prod].rhs.size();
+            for (std::size_t dot = 0; dot <= length; ++dot)
+            {
+                const int id = static_cast<int>(ids.size());
+                ids.emplace(LrItem{rule.first, static_cast<int>(prod),
+                                   static_cast<int>(dot)},
+                            id);
+            }
+        }
+    }
+    return ids;
+}
+
+/**
+ * @brief 预计算所有「圆点在末尾」的 core 编号。
+ * @param rules 增广文法规则表。
+ * @param coreIds core 编号映射。
+ * @return 完成项编号集合。
+ */
+std::unordered_set<int> buildCompleteCores(const RuleMap &rules,
+                                           const CoreIds &coreIds)
+{
+    std::unordered_set<int> result;
+    for (const auto &entry : coreIds)
+    {
+        if (isCompleteItem(entry.first, rules))
+        {
+            result.insert(entry.second);
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief 给所有文法符号按字典序编号（终结符与非终结符共用一套编号）。
+ * @param terminals 终结符表。
+ * @param nonterms 非终结符表。
+ * @return 符号到编号的映射。
+ */
+std::map<std::string, int> buildSymbolIds(
+    const std::vector<std::string> &terminals,
+    const std::vector<std::string> &nonterms)
+{
+    std::set<std::string> names(terminals.begin(), terminals.end());
+    names.insert(nonterms.begin(), nonterms.end());
+    std::map<std::string, int> ids;
+    for (const std::string &name : names)
+    {
+        ids[name] = static_cast<int>(ids.size());
+    }
+    return ids;
+}
 
 /**
  * @brief 判断项是否已完成（圆点在末尾）。
@@ -87,17 +157,22 @@ std::string itemText(const LrItem &item, const RuleMap &rules)
  * @param rules 规则表。
  * @return 启用的完成项（按 LR(1) 项顺序）。
  */
-std::vector<LrItem> enabledReductions(const std::set<Lr1Item> &items,
-                                      const std::string &token,
-                                      const RuleMap &rules)
+std::vector<int> enabledReductions(
+    const std::set<Lr1Item> &items, const std::string &token,
+    const CoreIds &coreIds, const std::unordered_set<int> &completeCores)
 {
-    std::vector<LrItem> enabled;
+    std::vector<int> enabled;
     for (const Lr1Item &item : items)
     {
-        const LrItem core{item.lhs, item.prod, item.dot};
-        if ((item.lookahead == token) && isCompleteItem(core, rules))
+        if (item.lookahead != token)
         {
-            enabled.push_back(core);
+            continue;
+        }
+        const auto found =
+            coreIds.find(LrItem{item.lhs, item.prod, item.dot});
+        if ((found != coreIds.end()) && (completeCores.count(found->second) != 0))
+        {
+            enabled.push_back(found->second);
         }
     }
     return enabled;
@@ -172,18 +247,23 @@ void buildQuotient(
  * @param lr1Transitions 规范 LR(1) 转移。
  * @param blockOf 输入 / 输出：每个 LR(1) 状态所属块。
  * @param blockCount 输入 / 输出：块数量。
+ * @param symbolIds 文法符号的字典序编号。
  */
 void stabilizePartition(
     const std::vector<std::set<Lr1Item>> &lr1States,
     const std::map<std::pair<int, std::string>, int> &lr1Transitions,
-    std::vector<int> &blockOf, int &blockCount)
+    std::vector<int> &blockOf, int &blockCount,
+    const std::map<std::string, int> &symbolIds)
 {
-    std::vector<std::vector<std::pair<std::string, int>>> successors(
-        lr1States.size());
+    std::vector<std::vector<std::pair<int, int>>> successors(lr1States.size());
     for (const auto &entry : lr1Transitions)
     {
-        successors[static_cast<std::size_t>(entry.first.first)].push_back(
-            {entry.first.second, entry.second});
+        const auto symbolIt = symbolIds.find(entry.first.second);
+        if (symbolIt != symbolIds.end())
+        {
+            successors[static_cast<std::size_t>(entry.first.first)].push_back(
+                {symbolIt->second, entry.second});
+        }
     }
     bool changed = true;
     while (changed)
@@ -200,12 +280,11 @@ void stabilizePartition(
             {
                 continue;
             }
-            std::map<std::vector<std::pair<std::string, int>>,
-                     std::vector<int>>
+            std::map<std::vector<std::pair<int, int>>, std::vector<int>>
                 groups;
             for (const int stateId : entry.second)
             {
-                std::vector<std::pair<std::string, int>> key;
+                std::vector<std::pair<int, int>> key;
                 for (const auto &successor : successors[static_cast<std::size_t>(
                          stateId)])
                 {
@@ -241,13 +320,15 @@ void stabilizePartition(
  * @param lr1States 规范 LR(1) 项集族。
  * @param block 要拆分的块编号。
  * @param token 触发拆分的 Token。
- * @param rules 规则表。
+ * @param coreIds LR(0) 项整数编号。
+ * @param completeCores 完成项编号集合。
  * @return 发生了拆分返回 true；无法再拆返回 false。
  */
 bool splitBlockOnToken(std::vector<int> &blockOf, int &blockCount,
                        const std::vector<std::set<Lr1Item>> &lr1States,
                        int block, const std::string &token,
-                       const RuleMap &rules)
+                       const CoreIds &coreIds,
+                       const std::unordered_set<int> &completeCores)
 {
     std::vector<int> members;
     for (std::size_t stateId = 0; stateId < blockOf.size(); ++stateId)
@@ -257,11 +338,11 @@ bool splitBlockOnToken(std::vector<int> &blockOf, int &blockCount,
             members.push_back(static_cast<int>(stateId));
         }
     }
-    std::map<std::vector<LrItem>, std::vector<int>> groups;
+    std::map<std::vector<int>, std::vector<int>> groups;
     for (const int stateId : members)
     {
         groups[enabledReductions(lr1States[static_cast<std::size_t>(stateId)],
-                                 token, rules)]
+                                 token, coreIds, completeCores)]
             .push_back(stateId);
     }
     if (groups.size() <= 1)
@@ -343,11 +424,19 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     result.lr1StateCount = static_cast<int>(lalrStates.size());
     result.hasFollow = false;
 
+    // 建表只读写 action / gotoTable / resolutions / unresolved / warnings，
+    // 其余字段（文法、FIRST、状态族等）在整轮拆分里不变。复用同一个
+    // candidate，每轮只重置这些字段，避免反复深拷贝整个 AnalysisResult。
     AnalysisResult candidate = result;
-    candidate.action.clear();
-    candidate.gotoTable.clear();
-    candidate.resolutions.clear();
-    candidate.unresolved.clear();
+    const auto resetProbe = [&candidate, &result]()
+    {
+        candidate.action.clear();
+        candidate.gotoTable.clear();
+        candidate.resolutions.clear();
+        candidate.unresolved.clear();
+        candidate.warnings = result.warnings;
+    };
+    resetProbe();
     buildLalrStyleTables(lalrStates, lalrTransitions, candidate.grammar.rules,
                          candidate.terminals, candidate.nonterms,
                          candidate.grammar.start, normalized, "IELR", candidate,
@@ -369,6 +458,11 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     }
     else
     {
+    const CoreIds coreIds = buildCoreIds(result.grammar.rules);
+    const std::unordered_set<int> completeCores =
+        buildCompleteCores(result.grammar.rules, coreIds);
+    const std::map<std::string, int> symbolIds =
+        buildSymbolIds(result.terminals, result.nonterms);
     std::vector<std::set<Lr1Item>> lr1States;
     std::map<std::pair<int, std::string>, int> lr1Transitions;
     lr1BuildAutomaton(result.grammar.rules, nontermSet, start, result.first,
@@ -386,15 +480,27 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     std::map<std::pair<int, std::string>, int> transitions;
     buildQuotient(lr1States, lr1Transitions, blockOf, blockCount, states,
                   transitions);
+    // 块 -> 原始 LALR 状态：拆分后增量刷新，避免每个冲突都全量扫 blockOf。
+    std::vector<int> ancestorOfBlock(static_cast<std::size_t>(blockCount), -1);
+    const auto refreshAncestors = [&]()
+    {
+        std::fill(ancestorOfBlock.begin(), ancestorOfBlock.end(), -1);
+        for (std::size_t stateId = 0; stateId < blockOf.size(); ++stateId)
+        {
+            const int block = blockOf[stateId];
+            if (ancestorOfBlock[static_cast<std::size_t>(block)] < 0)
+            {
+                ancestorOfBlock[static_cast<std::size_t>(block)] =
+                    stateMap[stateId];
+            }
+        }
+    };
+    refreshAncestors();
 
     // 用当前划分建一次表；有未消解的归约/归约冲突就拆分再试。
     const auto rebuild = [&]()
     {
-        candidate = result;
-        candidate.action.clear();
-        candidate.gotoTable.clear();
-        candidate.resolutions.clear();
-        candidate.unresolved.clear();
+        resetProbe();
         buildLalrStyleTables(states, transitions, candidate.grammar.rules,
                              candidate.terminals, candidate.nonterms,
                              candidate.grammar.start, normalized, "IELR",
@@ -409,24 +515,13 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     std::vector<std::string> splitReasons(mergedStates.size());
     std::vector<std::string> splitTokens(mergedStates.size());
     std::vector<std::string> splitKinds(mergedStates.size());
-    while (hasReduceReduceConflict(candidate.unresolved))
+    const LrConflict *conflict =
+        firstReduceReduceConflict(candidate.unresolved);
+    while (conflict != nullptr)
     {
-        const LrConflict *conflict =
-            firstReduceReduceConflict(candidate.unresolved);
-        if (conflict == nullptr)
-        {
-            break;
-        }
         const int block = conflict->state;
-        int ancestor = -1;
-        for (std::size_t stateId = 0; stateId < blockOf.size(); ++stateId)
-        {
-            if (blockOf[stateId] == block)
-            {
-                ancestor = stateMap[stateId];
-                break;
-            }
-        }
+        const int ancestor =
+            ancestorOfBlock[static_cast<std::size_t>(block)];
         if ((ancestor >= 0) &&
             splitReasons[static_cast<std::size_t>(ancestor)].empty())
         {
@@ -449,15 +544,18 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
             splitKinds[static_cast<std::size_t>(ancestor)] = conflict->kind;
         }
         if (!splitBlockOnToken(blockOf, blockCount, lr1States, block,
-                               conflict->token, candidate.grammar.rules))
+                               conflict->token, coreIds, completeCores))
         {
             // 划分已细到规范 LR(1) 仍冲突：文法不是 LR(1)，交给最终校验报错。
             break;
         }
-        stabilizePartition(lr1States, lr1Transitions, blockOf, blockCount);
+        stabilizePartition(lr1States, lr1Transitions, blockOf, blockCount,
+                           symbolIds);
         buildQuotient(lr1States, lr1Transitions, blockOf, blockCount, states,
                       transitions);
         rebuild();
+        refreshAncestors();
+        conflict = firstReduceReduceConflict(candidate.unresolved);
     }
 
     result.lalrStates = states;
@@ -481,12 +579,6 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     result.warnings = candidate.warnings;
 
     // 汇总拆分记录：每个被拆开的 LALR 状态一行。
-    std::vector<int> ancestorOfBlock(static_cast<std::size_t>(blockCount), -1);
-    for (std::size_t stateId = 0; stateId < blockOf.size(); ++stateId)
-    {
-        ancestorOfBlock[static_cast<std::size_t>(blockOf[stateId])] =
-            stateMap[stateId];
-    }
     std::map<int, std::vector<int>> partsByLalr;
     for (int block = 0; block < blockCount; ++block)
     {
