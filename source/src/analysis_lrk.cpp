@@ -18,9 +18,13 @@
 #include "HareParse/analysis.hpp"
 
 #include <algorithm>
+#include <array>
 #include <climits>
+#include <deque>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "HareParse/analysis_internal.hpp"
 #include "HareParse/grammar_loader.hpp"
@@ -129,6 +133,171 @@ std::string endLookaheadKey(int k)
         static_cast<std::size_t>(k), std::string("END")));
 }
 
+/// 紧凑的 k 元组键：以整数编码的符号序列，替代「分隔符拼字符串」。
+struct CompactKey
+{
+    /// 有效长度与符号，符号从下标 1 开始；不足的槽位为 -1。
+    std::array<int, 9> symbols{};
+    /// 有效符号个数。
+    int length{0};
+    /// 字典序：先按长度，再按符号编号；与字符串键的排序语义一致。
+    bool operator<(const CompactKey &other) const
+    {
+        if (length != other.length)
+        {
+            return length < other.length;
+        }
+        for (int index = 0; index < length; ++index)
+        {
+            if (symbols[index + 1] != other.symbols[index + 1])
+            {
+                return symbols[index + 1] < other.symbols[index + 1];
+            }
+        }
+        return false;
+    }
+    /// 相等判定。
+    bool operator==(const CompactKey &other) const
+    {
+        if (length != other.length)
+        {
+            return false;
+        }
+        for (int index = 0; index < length; ++index)
+        {
+            if (symbols[index + 1] != other.symbols[index + 1])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+/// 紧凑键支持的最大 k；超过时回退到字符串键实现。
+constexpr int kCompactMaxK = 8;
+
+/// 紧凑键的哈希：FIRST_k / FOLLOW_k 的集合只做并集，不需要有序树。
+struct CompactKeyHash
+{
+    /// 计算哈希值。
+    std::size_t operator()(const CompactKey &key) const
+    {
+        std::size_t value = static_cast<std::size_t>(key.length) + 1u;
+        for (int index = 1; index <= key.length; ++index)
+        {
+            value = value * 131u +
+                    static_cast<std::size_t>(key.symbols[index] + 1);
+        }
+        return value;
+    }
+};
+
+/// 紧凑 k 元组集合。
+using CompactKeySet = std::unordered_set<CompactKey, CompactKeyHash>;
+
+/**
+ * @brief 终结符名与紧凑键之间的编解码器。
+ *
+ * 0 号固定留给「空前缀」（对应原实现的空串键），终结符按需编号，
+ * 因此非终结符的 FIRST_k 里可能出现的任何符号都有稳定编号。
+ */
+class CompactKeyCodec
+{
+public:
+    /// 构造编解码器并预留空前缀编号。
+    explicit CompactKeyCodec(int k) : k_(k)
+    {
+        (void)idOf(std::string());
+    }
+    /// 取（或分配）符号编号。
+    int idOf(const std::string &name)
+    {
+        const auto found = ids_.find(name);
+        if (found != ids_.end())
+        {
+            return found->second;
+        }
+        const int id = static_cast<int>(names_.size());
+        ids_.emplace(name, id);
+        names_.push_back(name);
+        return id;
+    }
+    /// 按编号取符号名。
+    const std::string &nameOf(int id) const
+    {
+        return names_[static_cast<std::size_t>(id)];
+    }
+    /// 把字符串键编成紧凑键；未知符号会先分配编号。
+    CompactKey encode(const std::string &key)
+    {
+        CompactKey result;
+        for (const std::string &symbol : splitLookaheadKey(key))
+        {
+            if (result.length >= k_)
+            {
+                break;
+            }
+            result.symbols[++result.length] = idOf(symbol);
+        }
+        return result;
+    }
+    /// 把紧凑键还原成字符串键（报告与产物仍用字符串形式）。
+    std::string decode(const CompactKey &key) const
+    {
+        std::vector<std::string> symbols;
+        symbols.reserve(static_cast<std::size_t>(key.length));
+        for (int index = 1; index <= key.length; ++index)
+        {
+            symbols.push_back(names_[static_cast<std::size_t>(key.symbols[index])]);
+        }
+        return lookaheadKeyOf(symbols);
+    }
+    /// 单个终结符构成的紧凑键。
+    CompactKey single(const std::string &name)
+    {
+        CompactKey result;
+        result.length = 1;
+        result.symbols[1] = idOf(name);
+        return result;
+    }
+    /// 拼接两个紧凑键并截断到 k 个符号。
+    CompactKey concat(const CompactKey &prefix, const CompactKey &tail) const
+    {
+        CompactKey result;
+        for (int index = 1; index <= prefix.length && result.length < k_;
+             ++index)
+        {
+            result.symbols[++result.length] = prefix.symbols[index];
+        }
+        for (int index = 1; index <= tail.length && result.length < k_;
+             ++index)
+        {
+            result.symbols[++result.length] = tail.symbols[index];
+        }
+        return result;
+    }
+    /// 生成一个全为指定符号的 k 元组键。
+    CompactKey repeated(const std::string &name, int k)
+    {
+        CompactKey result;
+        const int id = idOf(name);
+        for (int index = 0; index < k && index < kCompactMaxK; ++index)
+        {
+            result.symbols[++result.length] = id;
+        }
+        return result;
+    }
+
+private:
+    /// 展望符长度。
+    int k_;
+    /// 符号名 -> 编号。
+    std::map<std::string, int> ids_;
+    /// 编号 -> 符号名。
+    std::vector<std::string> names_;
+};
+
 } // namespace
 
 std::string lookaheadKeyOf(const std::vector<std::string> &symbols)
@@ -182,7 +351,7 @@ std::vector<std::string> lookaheadKeySymbols(const std::string &key)
 namespace lrk_detail
 {
 
-std::map<std::string, std::set<std::string>> computeFirstK(
+static std::map<std::string, std::set<std::string>> computeFirstKSlow(
     const std::map<std::string, std::vector<Production>> &rules,
     const std::vector<std::string> &terminals,
     const std::vector<std::string> &nonterms, int k)
@@ -316,7 +485,7 @@ std::set<std::string> extendLookahead(const std::set<std::string> &prefixes,
     return result;
 }
 
-std::map<std::string, std::set<std::string>> computeFollowK(
+static std::map<std::string, std::set<std::string>> computeFollowKSlow(
     const std::string &start,
     const std::map<std::string, std::vector<Production>> &rules,
     const std::vector<std::string> &nonterms, int k,
@@ -383,6 +552,732 @@ std::map<std::string, std::set<std::string>> computeFollowK(
     }
     return followK;
 }
+
+/**
+ * @brief 计算一个符号序列的紧凑 FIRST_k 集合。
+ * @param sequence 符号序列。
+ * @param k 展望符长度。
+ * @param indexOf 非终结符到紧凑下标的映射。
+ * @param first 各非终结符的紧凑 FIRST_k 集合。
+ * @param codec 键编解码器。
+ * @return 紧凑 k 元组集合。
+ */
+static CompactKeySet compactFirstSequence(
+    const std::vector<std::string> &sequence, int k,
+    const std::map<std::string, int> &indexOf,
+    const std::vector<CompactKeySet> &first, CompactKeyCodec &codec)
+{
+    CompactKeySet current;
+    current.insert(CompactKey{});
+    for (const std::string &symbol : sequence)
+    {
+        CompactKeySet singlePieces;
+        const CompactKeySet *pieces = nullptr;
+        const auto found = indexOf.find(symbol);
+        if (found != indexOf.end())
+        {
+            pieces = &first[static_cast<std::size_t>(found->second)];
+        }
+        else
+        {
+            singlePieces.insert(codec.single(symbol));
+            pieces = &singlePieces;
+        }
+        CompactKeySet next;
+        for (const CompactKey &prefix : current)
+        {
+            for (const CompactKey &piece : *pieces)
+            {
+                next.insert(codec.concat(prefix, piece));
+            }
+        }
+        current.swap(next);
+        bool full = true;
+        for (const CompactKey &key : current)
+        {
+            if (key.length < k)
+            {
+                full = false;
+                break;
+            }
+        }
+        if (full)
+        {
+            break;
+        }
+    }
+    return current;
+}
+
+/**
+ * @brief 非终结符下标与产生式的紧凑描述（非终结符编号取负保存）。
+ */
+struct CompactProduction
+{
+    /// 左部的非终结符下标。
+    int lhs{0};
+    /// 右部符号：>= 0 是终结符编号，< 0 是非终结符「-(下标+1)」。
+    std::vector<int> symbols;
+};
+
+/**
+ * @brief 用整数编号 + worklist 传播计算 FIRST_k。
+ *
+ * @details 相比字符串键 + while(changed) 全表重扫，这里把 k 元组编码成定长
+ * 整数数组，并且只把「右部用到了刚变化非终结符」的产生式重新入队。
+ * 集合的最终不动点与原实现完全一致，只是达成方式更快。
+ * @param rules 规则表。
+ * @param terminals 终结符表（仅用于回退路径）。
+ * @param nonterms 非终结符表。
+ * @param k 展望符长度。
+ * @return FIRST_k 表。
+ */
+std::map<std::string, std::set<std::string>> computeFirstK(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::vector<std::string> &terminals,
+    const std::vector<std::string> &nonterms, int k)
+{
+    if ((k < 0) || (k > kCompactMaxK))
+    {
+        return computeFirstKSlow(rules, terminals, nonterms, k);
+    }
+    CompactKeyCodec codec(k);
+    std::map<std::string, int> indexOf;
+    for (std::size_t index = 0; index < nonterms.size(); ++index)
+    {
+        indexOf[nonterms[index]] = static_cast<int>(index);
+    }
+    const std::size_t count = nonterms.size();
+    std::vector<CompactProduction> productions;
+    std::vector<std::vector<std::size_t>> byLhs(count);
+    std::vector<std::vector<int>> dependents(count);
+    for (const auto &rule : rules)
+    {
+        const auto lhsFound = indexOf.find(rule.first);
+        if (lhsFound == indexOf.end())
+        {
+            continue;
+        }
+        const int lhs = lhsFound->second;
+        for (const Production &production : rule.second)
+        {
+            CompactProduction compact;
+            compact.lhs = lhs;
+            std::set<int> used;
+            for (const std::string &symbol : production.rhs)
+            {
+                const auto found = indexOf.find(symbol);
+                if (found != indexOf.end())
+                {
+                    compact.symbols.push_back(-found->second - 1);
+                    used.insert(found->second);
+                }
+                else
+                {
+                    compact.symbols.push_back(codec.idOf(symbol));
+                }
+            }
+            byLhs[static_cast<std::size_t>(lhs)].push_back(productions.size());
+            for (const int name : used)
+            {
+                dependents[static_cast<std::size_t>(name)].push_back(lhs);
+            }
+            productions.push_back(compact);
+        }
+    }
+    for (auto &entry : dependents)
+    {
+        std::sort(entry.begin(), entry.end());
+        entry.erase(std::unique(entry.begin(), entry.end()), entry.end());
+    }
+    std::vector<CompactKeySet> first(count);
+    std::deque<int> pending;
+    std::vector<char> queued(count, 1);
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        pending.push_back(static_cast<int>(index));
+    }
+    while (!pending.empty())
+    {
+        const int lhs = pending.front();
+        pending.pop_front();
+        queued[static_cast<std::size_t>(lhs)] = 0;
+        bool changed = false;
+        for (const std::size_t productionId :
+             byLhs[static_cast<std::size_t>(lhs)])
+        {
+            const CompactProduction &production =
+                productions[productionId];
+            CompactKeySet current;
+            current.insert(CompactKey{});
+            for (const int symbol : production.symbols)
+            {
+                CompactKeySet singlePieces;
+                const CompactKeySet *pieces = nullptr;
+                if (symbol < 0)
+                {
+                    pieces = &first[static_cast<std::size_t>(-symbol - 1)];
+                }
+                else
+                {
+                    CompactKey one;
+                    one.length = 1;
+                    one.symbols[1] = symbol;
+                    singlePieces.insert(one);
+                    pieces = &singlePieces;
+                }
+                CompactKeySet next;
+                for (const CompactKey &prefix : current)
+                {
+                    for (const CompactKey &piece : *pieces)
+                    {
+                        next.insert(codec.concat(prefix, piece));
+                    }
+                }
+                current.swap(next);
+                bool full = true;
+                for (const CompactKey &key : current)
+                {
+                    if (key.length < k)
+                    {
+                        full = false;
+                        break;
+                    }
+                }
+                if (full)
+                {
+                    break;
+                }
+            }
+            for (const CompactKey &key : current)
+            {
+                if (first[static_cast<std::size_t>(lhs)].insert(key).second)
+                {
+                    changed = true;
+                }
+            }
+        }
+        if (changed)
+        {
+            for (const int name : dependents[static_cast<std::size_t>(lhs)])
+            {
+                if (queued[static_cast<std::size_t>(name)] == 0)
+                {
+                    queued[static_cast<std::size_t>(name)] = 1;
+                    pending.push_back(name);
+                }
+            }
+        }
+    }
+    std::map<std::string, std::set<std::string>> result;
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        for (const CompactKey &key : first[index])
+        {
+            result[nonterms[index]].insert(codec.decode(key));
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief 用整数编号 + worklist 传播计算 FOLLOW_k。
+ *
+ * @details 与原实现同样的传播规则（A -> αBβ 时把 FIRST_k(β) 接上
+ * FOLLOW_k(A) 传给 B），但 β 的 FIRST_k 只算一次，且只在左部集合变化时
+ * 重扫相关产生式；error 伪终结符同样不传播。
+ * @param start 起始非终结符。
+ * @param rules 规则表。
+ * @param nonterms 非终结符表。
+ * @param k 展望符长度。
+ * @param firstK 字符串形式的 FIRST_k 表。
+ * @return FOLLOW_k 表。
+ */
+std::map<std::string, std::set<std::string>> computeFollowK(
+    const std::string &start,
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::vector<std::string> &nonterms, int k,
+    const std::map<std::string, std::set<std::string>> &firstK)
+{
+    if ((k < 0) || (k > kCompactMaxK))
+    {
+        return computeFollowKSlow(start, rules, nonterms, k, firstK);
+    }
+    CompactKeyCodec codec(k);
+    std::map<std::string, int> indexOf;
+    for (std::size_t index = 0; index < nonterms.size(); ++index)
+    {
+        indexOf[nonterms[index]] = static_cast<int>(index);
+    }
+    const std::size_t count = nonterms.size();
+    std::vector<CompactKeySet> first(count);
+    for (const auto &entry : firstK)
+    {
+        const auto found = indexOf.find(entry.first);
+        if (found == indexOf.end())
+        {
+            continue;
+        }
+        for (const std::string &key : entry.second)
+        {
+            first[static_cast<std::size_t>(found->second)].insert(
+                codec.encode(key));
+        }
+    }
+    /**
+     * @brief 一条 FOLLOW 传播边：左部 lhs 的产生式右部在 symbol 之前出现。
+     */
+    struct FollowEdge
+    {
+        /// 左部下标。
+        int lhs{0};
+        /// 要接收 FOLLOW 的非终结符下标。
+        int symbol{0};
+        /// symbol 之后后缀的 FIRST_k。
+        CompactKeySet beta;
+    };
+    std::vector<FollowEdge> edges;
+    std::vector<std::vector<std::size_t>> byLhs(count);
+    std::vector<std::vector<int>> dependents(count);
+    for (const auto &rule : rules)
+    {
+        const auto lhsFound = indexOf.find(rule.first);
+        if (lhsFound == indexOf.end())
+        {
+            continue;
+        }
+        const int lhs = lhsFound->second;
+        for (const Production &production : rule.second)
+        {
+            const std::vector<std::string> &rhs = production.rhs;
+            for (std::size_t index = 0; index < rhs.size(); ++index)
+            {
+                const auto found = indexOf.find(rhs[index]);
+                if (found == indexOf.end())
+                {
+                    continue;
+                }
+                const int symbol = found->second;
+                const std::vector<std::string> suffix(
+                    rhs.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+                    rhs.end());
+                FollowEdge edge;
+                edge.lhs = lhs;
+                edge.symbol = symbol;
+                edge.beta = compactFirstSequence(suffix, k, indexOf, first,
+                                                  codec);
+                byLhs[static_cast<std::size_t>(lhs)].push_back(edges.size());
+                dependents[static_cast<std::size_t>(lhs)].push_back(symbol);
+                edges.push_back(edge);
+            }
+        }
+    }
+    for (auto &entry : dependents)
+    {
+        std::sort(entry.begin(), entry.end());
+        entry.erase(std::unique(entry.begin(), entry.end()), entry.end());
+    }
+    std::vector<CompactKeySet> follow(count);
+    const auto startFound = indexOf.find(start);
+    if (startFound != indexOf.end())
+    {
+        follow[static_cast<std::size_t>(startFound->second)].insert(
+            codec.repeated("END", k));
+    }
+    std::deque<int> pending;
+    std::vector<char> queued(count, 1);
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        pending.push_back(static_cast<int>(index));
+    }
+    while (!pending.empty())
+    {
+        const int lhs = pending.front();
+        pending.pop_front();
+        queued[static_cast<std::size_t>(lhs)] = 0;
+        const std::vector<CompactKey> snapshot(
+            follow[static_cast<std::size_t>(lhs)].begin(),
+            follow[static_cast<std::size_t>(lhs)].end());
+        bool changed = false;
+        for (const std::size_t edgeId :
+             byLhs[static_cast<std::size_t>(lhs)])
+        {
+            const FollowEdge &edge = edges[edgeId];
+            for (const CompactKey &tail : snapshot)
+            {
+                for (const CompactKey &beta : edge.beta)
+                {
+                    const CompactKey value = codec.concat(beta, tail);
+                    if ((value.length > 0) &&
+                        (codec.nameOf(value.symbols[1]) ==
+                         k_errorTokenName))
+                    {
+                        continue;
+                    }
+                    if (follow[static_cast<std::size_t>(edge.symbol)].insert(
+                            value)
+                            .second)
+                    {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if (changed)
+        {
+            for (const int name : dependents[static_cast<std::size_t>(lhs)])
+            {
+                if (queued[static_cast<std::size_t>(name)] == 0)
+                {
+                    queued[static_cast<std::size_t>(name)] = 1;
+                    pending.push_back(name);
+                }
+            }
+        }
+    }
+    std::map<std::string, std::set<std::string>> result;
+    for (std::size_t index = 0; index < count; ++index)
+    {
+        for (const CompactKey &key : follow[index])
+        {
+            result[nonterms[index]].insert(codec.decode(key));
+        }
+    }
+    return result;
+}
+
+/**
+ * @brief 紧凑 LR(k) 状态：按 core 编号升序的 (core, 展望符 k 元组集合)。
+ */
+struct CompactKState
+{
+    /// (core 编号, 展望符 k 元组集合)，按 core 编号升序。
+    std::vector<std::pair<int, CompactKeySet>> items;
+    /** @brief 状态相等（集合语义，与遍历顺序无关）。 @param other 另一状态。 @return 相等返回真。 */
+    bool operator==(const CompactKState &other) const
+    {
+        if (items.size() != other.items.size())
+        {
+            return false;
+        }
+        for (std::size_t index = 0u; index < items.size(); ++index)
+        {
+            if ((items[index].first != other.items[index].first) ||
+                (items[index].second != other.items[index].second))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+/** @brief 单个紧凑键的顺序无关哈希。 @param key 键。 @return 哈希值。 */
+static std::size_t hashCompactKey(const CompactKey &key)
+{
+    std::size_t hash = static_cast<std::size_t>(key.length) + 1u;
+    for (int index = 1; index <= key.length; ++index)
+    {
+        hash = hash * 131u +
+               static_cast<std::size_t>(key.symbols[index] + 1);
+    }
+    return hash;
+}
+
+/**
+ * @brief 紧凑 LR(k) 状态哈希（供状态去重）。
+ *
+ * 展望符集合是无序容器，哈希必须与遍历顺序无关：先把每个 key 算成独立的
+ * 值再用异或/加法汇总，否则同一集合的不同遍历顺序会得到不同哈希，导致
+ * 相同状态落进不同哈希桶、去重失效、状态数暴涨。
+ * @param state 状态。 @return 哈希值。
+ */
+static std::size_t hashCompactKState(const CompactKState &state)
+{
+    std::size_t hash = 1469598103934665603u;
+    for (const auto &entry : state.items)
+    {
+        std::size_t keyHash = 0u;
+        for (const CompactKey &key : entry.second)
+        {
+            keyHash += hashCompactKey(key) + 0x9e3779b97f4a7c15u;
+        }
+        const std::size_t value = static_cast<std::size_t>(entry.first) +
+                                  0x9e3779b97f4a7c15u + keyHash;
+        hash ^= value + 0x9e3779b97f4a7c15u + (hash << 6u) + (hash >> 2u);
+    }
+    return hash;
+}
+
+/** @brief 单个 LR(0) core 的紧凑闭包/转移元数据。 */
+struct CompactKCore
+{
+    /// 对应的 LR(0) 项。
+    LrItem item;
+    /// 圆点后的符号（圆点在末尾时为空）。
+    std::string symbol;
+    /// 移进该符号后的 core 编号。
+    int shiftCore = -1;
+    /// 圆点后是非终结符时，其各产生式的起始 core 编号。
+    std::vector<int> closureTargets;
+    /// FIRST_k(圆点后剩余符号串) 的紧凑集合（可空时含空键）。
+    CompactKeySet betaFirst;
+};
+
+/**
+ * @brief LR(k) 项集族的整数编号上下文。
+ *
+ * 把 core 编号成整数、展望符 k 元组用 CompactKey 表示，闭包传播时只做
+ * 整数拼接与集合并；相比字符串版每次闭包都重算 FIRST_k(β) 并拼键，
+ * 这里预计算每个 core 的 FIRST_k(β)，收敛后又用 worklist 去重。
+ */
+class CompactKContext
+{
+public:
+    /** @brief 构造上下文。 */
+    CompactKContext(
+        const std::map<std::string, std::vector<Production>> &rules,
+        const std::set<std::string> &nontermSet, const std::string &start,
+        const std::map<std::string, std::set<std::string>> &firstK, int k)
+        : codec_(k), k_(k)
+    {
+        for (const auto &rule : rules)
+        {
+            for (std::size_t prod = 0u; prod < rule.second.size(); ++prod)
+            {
+                const std::size_t length = rule.second[prod].rhs.size();
+                for (std::size_t dot = 0u; dot <= length; ++dot)
+                {
+                    coreIds_.emplace(LrItem{rule.first, static_cast<int>(prod),
+                                            static_cast<int>(dot)},
+                                     static_cast<int>(cores_.size()));
+                    cores_.push_back({rule.first, static_cast<int>(prod),
+                                      static_cast<int>(dot)});
+                }
+            }
+        }
+        std::map<std::string, int> indexOf;
+        std::vector<std::string> names;
+        for (const std::string &name : nontermSet)
+        {
+            indexOf[name] = static_cast<int>(names.size());
+            names.push_back(name);
+        }
+        std::vector<CompactKeySet> firstCompact(names.size());
+        for (const auto &entry : firstK)
+        {
+            const auto found = indexOf.find(entry.first);
+            if (found == indexOf.end())
+            {
+                continue;
+            }
+            for (const std::string &key : entry.second)
+            {
+                firstCompact[static_cast<std::size_t>(found->second)].insert(
+                    codec_.encode(key));
+            }
+        }
+        meta_.resize(cores_.size());
+        for (std::size_t index = 0u; index < cores_.size(); ++index)
+        {
+            initCore(static_cast<int>(index), rules, indexOf, firstCompact);
+        }
+        const auto startFound = coreIds_.find(LrItem{start, 0, 0});
+        startCore_ = startFound == coreIds_.end() ? -1 : startFound->second;
+        endKey_ = codec_.repeated("END", k);
+    }
+    /** @brief 用种子 core 与展望符集合求闭包。 */
+    CompactKState closure(
+        const std::vector<std::pair<int, CompactKeySet>> &seed) const
+    {
+        const std::size_t count = cores_.size();
+        std::vector<CompactKeySet> la(count);
+        std::vector<char> present(count, 0);
+        std::vector<char> queued(count, 0);
+        std::deque<int> work;
+        const auto mark = [&](int core)
+        {
+            if (!queued[static_cast<std::size_t>(core)])
+            {
+                queued[static_cast<std::size_t>(core)] = 1;
+                work.push_back(core);
+            }
+        };
+        const auto add = [&](int core, const CompactKey &key)
+        {
+            present[static_cast<std::size_t>(core)] = 1;
+            if (la[static_cast<std::size_t>(core)].insert(key).second)
+            {
+                mark(core);
+            }
+        };
+        for (const auto &entry : seed)
+        {
+            for (const CompactKey &key : entry.second)
+            {
+                add(entry.first, key);
+            }
+        }
+        while (!work.empty())
+        {
+            const int core = work.front();
+            work.pop_front();
+            queued[static_cast<std::size_t>(core)] = 0;
+            const CompactKCore &info = meta_[static_cast<std::size_t>(core)];
+            if (info.closureTargets.empty())
+            {
+                continue;
+            }
+            // 快照：传播目标可能就是自身，避免遍历时改集合导致迭代器失效
+            const std::vector<CompactKey> tails(
+                la[static_cast<std::size_t>(core)].begin(),
+                la[static_cast<std::size_t>(core)].end());
+            for (const CompactKey &beta : info.betaFirst)
+            {
+                for (const CompactKey &tail : tails)
+                {
+                    const CompactKey value = codec_.concat(beta, tail);
+                    for (const int target : info.closureTargets)
+                    {
+                        add(target, value);
+                    }
+                }
+            }
+        }
+        CompactKState result;
+        for (std::size_t core = 0u; core < count; ++core)
+        {
+            if (present[core] && !la[core].empty())
+            {
+                result.items.emplace_back(static_cast<int>(core),
+                                          std::move(la[core]));
+            }
+        }
+        return result;
+    }
+    /** @brief GOTO 转移后再求闭包。 */
+    CompactKState goTo(const CompactKState &state,
+                       const std::string &symbol) const
+    {
+        const std::size_t count = cores_.size();
+        std::vector<CompactKeySet> seeds(count);
+        std::vector<char> used(count, 0);
+        for (const auto &entry : state.items)
+        {
+            const CompactKCore &info =
+                meta_[static_cast<std::size_t>(entry.first)];
+            if ((info.shiftCore >= 0) && (info.symbol == symbol))
+            {
+                for (const CompactKey &key : entry.second)
+                {
+                    seeds[static_cast<std::size_t>(info.shiftCore)].insert(key);
+                }
+                used[static_cast<std::size_t>(info.shiftCore)] = 1;
+            }
+        }
+        std::vector<std::pair<int, CompactKeySet>> seedList;
+        for (std::size_t core = 0u; core < count; ++core)
+        {
+            if (used[core] && !seeds[core].empty())
+            {
+                seedList.emplace_back(static_cast<int>(core),
+                                      std::move(seeds[core]));
+            }
+        }
+        if (seedList.empty())
+        {
+            return {};
+        }
+        return closure(seedList);
+    }
+    /** @brief 把紧凑状态转回 Lr1Item 集合（报告/建表仍用字符串键）。 */
+    std::set<Lr1Item> toLr1Items(const CompactKState &state) const
+    {
+        std::set<Lr1Item> result;
+        for (const auto &entry : state.items)
+        {
+            const LrItem &core = cores_[static_cast<std::size_t>(entry.first)];
+            for (const CompactKey &key : entry.second)
+            {
+                result.insert({core.lhs, core.prod, core.dot,
+                               codec_.decode(key)});
+            }
+        }
+        return result;
+    }
+    /** @brief 起始 core 编号。 */
+    int startCore() const { return startCore_; }
+    /** @brief k 个 END 的紧凑展望符。 */
+    const CompactKey &endKey() const { return endKey_; }
+    /** @brief 按编号取 core。 @param id core 编号。 @return 对应的 LR(0) 项。 */
+    const LrItem &core(std::size_t id) const
+    {
+        return cores_[id];
+    }
+
+private:
+    void initCore(
+        int coreId,
+        const std::map<std::string, std::vector<Production>> &rules,
+        const std::map<std::string, int> &indexOf,
+        const std::vector<CompactKeySet> &firstCompact)
+    {
+        CompactKCore &info = meta_[static_cast<std::size_t>(coreId)];
+        info.item = cores_[static_cast<std::size_t>(coreId)];
+        const std::vector<std::string> &rhs =
+            rules.find(info.item.lhs)->second[
+                static_cast<std::size_t>(info.item.prod)].rhs;
+        const std::size_t dot = static_cast<std::size_t>(info.item.dot);
+        if (dot >= rhs.size())
+        {
+            return;
+        }
+        info.symbol = rhs[dot];
+        const auto shifted = coreIds_.find(
+            LrItem{info.item.lhs, info.item.prod, info.item.dot + 1});
+        if (shifted != coreIds_.end())
+        {
+            info.shiftCore = shifted->second;
+        }
+        const auto targetFound = indexOf.find(info.symbol);
+        if (targetFound != indexOf.end())
+        {
+            const auto targetRule = rules.find(info.symbol);
+            if (targetRule != rules.end())
+            {
+                for (std::size_t index = 0u;
+                     index < targetRule->second.size(); ++index)
+                {
+                    const auto target = coreIds_.find(
+                        LrItem{info.symbol, static_cast<int>(index), 0});
+                    if (target != coreIds_.end())
+                    {
+                        info.closureTargets.push_back(target->second);
+                    }
+                }
+            }
+            std::vector<std::string> suffix(rhs.begin() +
+                                                static_cast<std::ptrdiff_t>(dot) + 1,
+                                            rhs.end());
+            info.betaFirst = compactFirstSequence(
+                suffix, k_, indexOf, firstCompact, codec_);
+        }
+        else
+        {
+            CompactKeySet single;
+            single.insert(codec_.single(info.symbol));
+            info.betaFirst = std::move(single);
+        }
+    }
+
+    CompactKeyCodec codec_;
+    int k_;
+    std::vector<LrItem> cores_;
+    std::map<LrItem, int> coreIds_;
+    std::vector<CompactKCore> meta_;
+    int startCore_ = -1;
+    CompactKey endKey_;
+};
 
 std::set<Lr1Item> lrkClosure(
     const std::set<Lr1Item> &items,
@@ -489,7 +1384,10 @@ std::set<Lr1Item> lrkGoto(
     return lrkClosure(moved, rules, nontermSet, k, firstK);
 }
 
-void lrkBuildAutomaton(
+/**
+ * @brief 字符串键版的 LR(k) 自动机构造（k > kCompactMaxK 时的回退）。
+ */
+static void lrkBuildAutomatonSlow(
     const std::map<std::string, std::vector<Production>> &rules,
     const std::set<std::string> &nontermSet, const std::string &start, int k,
     const std::map<std::string, std::set<std::string>> &firstK,
@@ -555,6 +1453,104 @@ void lrkBuildAutomaton(
             }
             outTransitions[std::make_pair(stateId, symbol)] = targetId;
         }
+    }
+}
+
+/**
+ * @brief 紧凑（整数 core 编号 + CompactKey 位集）LR(k) 自动机构造。
+ */
+static void lrkBuildAutomatonFast(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::set<std::string> &nontermSet, const std::string &start, int k,
+    const std::map<std::string, std::set<std::string>> &firstK,
+    std::vector<std::set<Lr1Item>> &outStates,
+    std::map<std::pair<int, std::string>, int> &outTransitions)
+{
+    CompactKContext ctx(rules, nontermSet, start, firstK, k);
+    outStates.clear();
+    outTransitions.clear();
+    if (ctx.startCore() < 0)
+    {
+        return;
+    }
+    CompactKeySet endSet;
+    endSet.insert(ctx.endKey());
+    const CompactKState initial = ctx.closure({{ctx.startCore(), endSet}});
+    std::vector<CompactKState> compactStates;
+    compactStates.push_back(initial);
+    std::unordered_map<std::size_t, std::vector<int>> buckets;
+    buckets[hashCompactKState(initial)].push_back(0);
+    for (std::size_t cursor = 0u; cursor < compactStates.size(); ++cursor)
+    {
+        const std::size_t stateId = cursor;
+        std::set<std::string> symbols;
+        for (const auto &entry : compactStates[stateId].items)
+        {
+            const LrItem &core =
+                ctx.core(static_cast<std::size_t>(entry.first));
+            const std::vector<std::string> &rhs =
+                rules.at(core.lhs)[static_cast<std::size_t>(core.prod)].rhs;
+            if (static_cast<std::size_t>(core.dot) < rhs.size())
+            {
+                symbols.insert(rhs[static_cast<std::size_t>(core.dot)]);
+            }
+        }
+        for (const std::string &symbol : symbols)
+        {
+            const CompactKState target =
+                ctx.goTo(compactStates[stateId], symbol);
+            if (target.items.empty())
+            {
+                continue;
+            }
+            const std::size_t targetHash = hashCompactKState(target);
+            int targetId = -1;
+            const auto bucket = buckets.find(targetHash);
+            if (bucket != buckets.end())
+            {
+                for (const int candidate : bucket->second)
+                {
+                    if (compactStates[static_cast<std::size_t>(candidate)] ==
+                        target)
+                    {
+                        targetId = candidate;
+                        break;
+                    }
+                }
+            }
+            if (targetId < 0)
+            {
+                targetId = static_cast<int>(compactStates.size());
+                compactStates.push_back(target);
+                buckets[targetHash].push_back(targetId);
+            }
+            outTransitions[std::make_pair(static_cast<int>(stateId), symbol)] =
+                targetId;
+        }
+    }
+    outStates.reserve(compactStates.size());
+    for (const CompactKState &state : compactStates)
+    {
+        outStates.push_back(ctx.toLr1Items(state));
+    }
+}
+
+void lrkBuildAutomaton(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::set<std::string> &nontermSet, const std::string &start, int k,
+    const std::map<std::string, std::set<std::string>> &firstK,
+    std::vector<std::set<Lr1Item>> &outStates,
+    std::map<std::pair<int, std::string>, int> &outTransitions)
+{
+    if ((k > 0) && (k <= kCompactMaxK))
+    {
+        lrkBuildAutomatonFast(rules, nontermSet, start, k, firstK, outStates,
+                              outTransitions);
+    }
+    else
+    {
+        lrkBuildAutomatonSlow(rules, nontermSet, start, k, firstK, outStates,
+                              outTransitions);
     }
 }
 

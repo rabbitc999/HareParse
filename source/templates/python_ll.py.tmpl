@@ -68,7 +68,7 @@
         """取预测分析表的列号。
 
         LL(0) 恒为 0（不看 lookahead），LL(1) 用 Token 号，LL(k) 按窗口的 k 元组
-        二分查列；LL(k) 找不到对应的 k 元组时返回 -1。
+        直接查生成期算好的字典；找不到对应的 k 元组时返回 -1。
         """
         if _LOOKAHEAD_K == 0:
             return 0
@@ -79,18 +79,7 @@
         for index in range(1, _LOOKAHEAD_K):
             code += self._lookahead[index - 1].type * scale
             scale *= _TERMINAL_COUNT
-        low = 0
-        high = _LOOKAHEAD_COLUMN_COUNT - 1
-        while low <= high:
-            mid = low + (high - low) // 2
-            mid_code = _LOOKAHEAD_CODE[mid]
-            if mid_code == code:
-                return _LOOKAHEAD_COLUMN[mid]
-            if mid_code < code:
-                low = mid + 1
-            else:
-                high = mid - 1
-        return -1
+        return _LOOKAHEAD_COLUMN_BY_CODE.get(code, -1)
 
     def _ll_item_takes(self, index, column, head):
         """栈上第 ``index`` 项能不能**取**当前 Token（主循环能接着走）。

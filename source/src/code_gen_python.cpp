@@ -58,6 +58,15 @@ struct PyFollowRow
 };
 
 /**
+ * @brief DD 产生式的首 Token 集合行（`python_dd_tables.py` 的数组元素）。
+ */
+struct PyDdFirstRow
+{
+    bool any = false;                 ///< 可空产生式：不做首 Token 剪枝
+    std::vector<std::string> members; ///< 可能作为首个 Token 的名字
+};
+
+/**
  * @brief 一条固定字面量词法规则（`python_lex_rules.py` 的数组元素）。
  */
 struct PyLexRule
@@ -182,6 +191,10 @@ TEMPLATE_MODEL(HareParse::PyIntRow,
 TEMPLATE_MODEL(HareParse::PyFollowRow,
                tmpl::field("empty", &HareParse::PyFollowRow::empty),
                tmpl::field("members", &HareParse::PyFollowRow::members));
+
+TEMPLATE_MODEL(HareParse::PyDdFirstRow,
+               tmpl::field("any", &HareParse::PyDdFirstRow::any),
+               tmpl::field("members", &HareParse::PyDdFirstRow::members));
 
 TEMPLATE_MODEL(HareParse::PyLexRule,
                tmpl::field("literal", &HareParse::PyLexRule::literal),
@@ -375,6 +388,65 @@ std::vector<PyFollowRow> pyFollowRows(const AnalysisResult &analysis)
             }
         }
         row.empty = row.members.empty();
+        rows.push_back(row);
+    }
+    return rows;
+}
+
+/**
+ * @brief 计算每条 DD 产生式的首 Token 集合，供运行时跳过不可能的分支。
+ *
+ * 空产生式（可推出 epsilon）不做剪枝——它可能靠 FOLLOW 环境成功，
+ * 首 Token 集合为空并不代表「任何 Token 都不行」。
+ * @param analysis 分析结果。
+ * @return 与产生式编号一一对应的首 Token 行。
+ */
+std::vector<PyDdFirstRow> pyDdFirstRows(const AnalysisResult &analysis)
+{
+    std::vector<PyDdFirstRow> rows;
+    rows.reserve(analysis.productions.size());
+    const std::set<std::string> terminalSet(analysis.terminals.begin(),
+                                            analysis.terminals.end());
+    for (const Production &production : analysis.productions)
+    {
+        PyDdFirstRow row;
+        std::set<std::string> first;
+        bool nullable = true;
+        for (const std::string &symbol : production.rhs)
+        {
+            if (terminalSet.count(symbol) != 0u)
+            {
+                first.insert(symbol);
+                nullable = false;
+                break;
+            }
+            const auto found = analysis.first.find(symbol);
+            if (found == analysis.first.end())
+            {
+                nullable = false;
+                break;
+            }
+            for (const std::string &token : found->second)
+            {
+                if (token != k_epsilon)
+                {
+                    first.insert(token);
+                }
+            }
+            if (found->second.count(k_epsilon) == 0u)
+            {
+                nullable = false;
+                break;
+            }
+        }
+        row.any = nullable;
+        for (const std::string &terminal : analysis.terminals)
+        {
+            if (first.count(terminal) != 0u)
+            {
+                row.members.push_back(terminal);
+            }
+        }
         rows.push_back(row);
     }
     return rows;
@@ -606,6 +678,18 @@ std::string pyLlTables(const AnalysisResult &analysis)
             columnList.push_back(static_cast<long long>(entry.second));
         }
     }
+    // LL(k) 的列编码 -> 列号字典：运行时用 dict.get 取代二分查找。
+    std::string columnMap = "{";
+    for (std::size_t index = 0; index < codeList.size(); ++index)
+    {
+        if (index != 0u)
+        {
+            columnMap += ", ";
+        }
+        columnMap += std::to_string(codeList[index]) + ": " +
+                     std::to_string(columnList[index]);
+    }
+    columnMap += "}";
     // 产物文本全在 python_ll_tables.py 里（`_LL_TABLE = ` 这些行、节标题、
     // FOLLOW 集），生成器只摆数据。
     return tmpl::renderValues(
@@ -614,6 +698,7 @@ std::string pyLlTables(const AnalysisResult &analysis)
          {"has_columns", k >= 2},
          {"lookahead_code", pyIntList(codeList, "            ", 16u)},
          {"lookahead_column", pyIntList(columnList, "            ", 16u)},
+         {"lookahead_map", columnMap},
          {"left_empty", pyIntList(leftEmpty, "            ", 16u)},
          {"has_follow", k != 0},
          {"follow", tmpl::encode(pyFollowRows(analysis))}});
@@ -785,7 +870,8 @@ std::string pyDdTables(const AnalysisResult &analysis)
         Utils::loadTemplate("python_dd_tables.py"),
         {{"prod_start", pyIntList(starts, "            ", 16u)},
          {"prod_count", pyIntList(counts, "            ", 16u)},
-         {"prod_slots", pyIntList(slots, "            ", 16u)}});
+         {"prod_slots", pyIntList(slots, "            ", 16u)},
+         {"first", tmpl::encode(pyDdFirstRows(analysis))}});
 }
 
 /**

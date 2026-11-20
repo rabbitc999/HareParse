@@ -19,6 +19,8 @@
  */
 
 #include "HareParse/analysis.hpp"
+#include "HareParse/analysis_internal.hpp"
+#include "HareParse/analysis_lr_fast.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -330,6 +332,43 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
                       nontermSet);
     const std::string &start = result.grammar.start;
 
+    // P3 快速路径：先用 LR(0) + lookahead 传播构造 LALR 表。只有真的出现
+    // 未消解归约/归约冲突时才退回自动机拆分流程。
+    std::vector<LalrState> lalrStates;
+    std::map<std::pair<int, std::string>, int> lalrTransitions;
+    analysis_lr_fast::buildLalr(result.grammar.rules, nontermSet, start,
+                                result.first, result.terminals, lalrStates,
+                                lalrTransitions);
+    result.ielrLalrStateCount = static_cast<int>(lalrStates.size());
+    result.lr1StateCount = static_cast<int>(lalrStates.size());
+    result.hasFollow = false;
+
+    AnalysisResult candidate = result;
+    candidate.action.clear();
+    candidate.gotoTable.clear();
+    candidate.resolutions.clear();
+    candidate.unresolved.clear();
+    buildLalrStyleTables(lalrStates, lalrTransitions, candidate.grammar.rules,
+                         candidate.terminals, candidate.nonterms,
+                         candidate.grammar.start, normalized, "IELR", candidate,
+                         false);
+    const bool needsSplit = hasReduceReduceConflict(candidate.unresolved);
+
+    std::vector<int> blockOf;
+    std::vector<int> stateMap;
+    int blockCount = 0;
+    if (!needsSplit)
+    {
+        result.lalrStates = lalrStates;
+        result.transitions = lalrTransitions;
+        result.action = candidate.action;
+        result.gotoTable = candidate.gotoTable;
+        result.resolutions = candidate.resolutions;
+        result.unresolved = candidate.unresolved;
+        result.warnings = candidate.warnings;
+    }
+    else
+    {
     std::vector<std::set<Lr1Item>> lr1States;
     std::map<std::pair<int, std::string>, int> lr1Transitions;
     lr1BuildAutomaton(result.grammar.rules, nontermSet, start, result.first,
@@ -337,21 +376,18 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     result.lr1StateCount = static_cast<int>(lr1States.size());
 
     std::vector<LalrState> mergedStates;
-    std::vector<int> stateMap;
     lalrMergeStates(lr1States, mergedStates, stateMap);
     result.ielrLalrStateCount = static_cast<int>(mergedStates.size());
-    result.hasFollow = false;
 
     // 划分：LR(1) 状态 -> 块编号。初始为 LALR（按 core 合并）。
-    std::vector<int> blockOf = stateMap;
-    int blockCount = static_cast<int>(mergedStates.size());
+    blockOf = stateMap;
+    blockCount = static_cast<int>(mergedStates.size());
     std::vector<LalrState> states;
     std::map<std::pair<int, std::string>, int> transitions;
     buildQuotient(lr1States, lr1Transitions, blockOf, blockCount, states,
                   transitions);
 
     // 用当前划分建一次表；有未消解的归约/归约冲突就拆分再试。
-    AnalysisResult candidate;
     const auto rebuild = [&]()
     {
         candidate = result;
@@ -442,6 +478,7 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     result.gotoTable = candidate.gotoTable;
     result.resolutions = candidate.resolutions;
     result.unresolved = candidate.unresolved;
+    result.warnings = candidate.warnings;
 
     // 汇总拆分记录：每个被拆开的 LALR 状态一行。
     std::vector<int> ancestorOfBlock(static_cast<std::size_t>(blockCount), -1);
@@ -473,6 +510,7 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
                            ? "为保持 goto 转移一致，随相关状态一起细分"
                            : splitReasons[index];
         result.ielrSplits.push_back(split);
+    }
     }
 
     if (!checkUnresolvedConflictsForMode("IELR(1)", result, result.teach,

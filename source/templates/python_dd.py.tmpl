@@ -63,6 +63,12 @@
         for offset in range(count):
             production = start + offset
             self._dd_restore(mark)
+            # FIRST 剪枝：当前 Token 不可能作为这条产生式的首符号时，
+            # 直接跳过，省掉整条右部的匹配与回退（最坏情况下能止损指数回溯）。
+            first = _DD_PROD_FIRST[production]
+            if first is not None and self._current.type not in first:
+                self._dd_record_fail(next(iter(first)))
+                continue
             values = [None] * _DD_PROD_SLOTS[nonterm]
             if not self._dd_match(production, values, tree_mode):
                 continue

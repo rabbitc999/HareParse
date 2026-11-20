@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "HareParse/analysis_internal.hpp"
+#include "HareParse/analysis_lr_fast.hpp"
 #include "HareParse/grammar_loader.hpp"
 
 namespace HareParse
@@ -420,6 +421,46 @@ std::size_t lr1StateHash(const std::set<Lr1Item> &state)
  * @param outStates 输出 LR(1) 状态列表。
  * @param outTransitions 输出转移表。
  */
+/**
+ * @brief 从规则表和 FIRST 集合收集规范 LR(1) 构建需要的终结符表。
+ * @param rules 规则表。
+ * @param nontermSet 非终结符集合。
+ * @param first FIRST 集合。
+ * @return 终结符表（一定含 END）。
+ */
+std::vector<std::string> collectTerminalsForLr1(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::set<std::string> &nontermSet,
+    const std::map<std::string, std::set<std::string>> &first)
+{
+    std::vector<std::string> terminals{"END"};
+    for (const auto &rule : rules)
+    {
+        for (const Production &production : rule.second)
+        {
+            for (const std::string &symbol : production.rhs)
+            {
+                if ((nontermSet.count(symbol) == 0u) &&
+                    (symbol != HareParse::k_epsilon))
+                {
+                    terminals.push_back(symbol);
+                }
+            }
+        }
+    }
+    for (const auto &entry : first)
+    {
+        for (const std::string &symbol : entry.second)
+        {
+            if (symbol != HareParse::k_epsilon)
+            {
+                terminals.push_back(symbol);
+            }
+        }
+    }
+    return analysis_detail::uniqueInOrder(terminals);
+}
+
 void lr1BuildAutomaton(
     const std::map<std::string, std::vector<Production>> &rules,
     const std::set<std::string> &nontermSet, const std::string &start,
@@ -427,68 +468,14 @@ void lr1BuildAutomaton(
     std::vector<std::set<Lr1Item>> &outStates,
     std::map<std::pair<int, std::string>, int> &outTransitions)
 {
-    const std::set<Lr1Item> startState =
-        lr1Closure({{start, 0, 0, "END"}}, rules, nontermSet, first);
-    outStates.clear();
-    outStates.push_back(startState);
-    // 用「哈希 -> 候选状态编号」分桶：绝大多数查找只比一次，
-    // 不必像 std::map<set<Lr1Item>> 那样每次都做整集逐元素比较。
-    std::unordered_map<std::size_t, std::vector<int>> stateIds;
-    stateIds[lr1StateHash(startState)].push_back(0);
-    std::vector<int> pending{0};
-    while (!pending.empty())
-    {
-        const int stateId = pending.front();
-        pending.erase(pending.begin());
-        std::vector<std::string> symbols;
-        for (const Lr1Item &item : outStates[static_cast<std::size_t>(stateId)])
-        {
-            const std::vector<std::string> &rhs =
-                rules.at(item.lhs)[static_cast<std::size_t>(item.prod)].rhs;
-            if (static_cast<std::size_t>(item.dot) >= rhs.size())
-            {
-                continue;
-            }
-            const std::string &symbol = rhs[static_cast<std::size_t>(item.dot)];
-            if (std::find(symbols.begin(), symbols.end(), symbol) ==
-                symbols.end())
-            {
-                symbols.push_back(symbol);
-            }
-        }
-        for (const std::string &symbol : symbols)
-        {
-            const std::set<Lr1Item> target =
-                lr1Goto(outStates[static_cast<std::size_t>(stateId)], symbol,
-                        rules, nontermSet, first);
-            if (target.empty())
-            {
-                continue;
-            }
-            const std::size_t targetHash = lr1StateHash(target);
-            int targetId = -1;
-            const auto bucket = stateIds.find(targetHash);
-            if (bucket != stateIds.end())
-            {
-                for (const int candidate : bucket->second)
-                {
-                    if (outStates[static_cast<std::size_t>(candidate)] == target)
-                    {
-                        targetId = candidate;
-                        break;
-                    }
-                }
-            }
-            if (targetId < 0)
-            {
-                targetId = static_cast<int>(outStates.size());
-                outStates.push_back(target);
-                stateIds[targetHash].push_back(targetId);
-                pending.push_back(targetId);
-            }
-            outTransitions[std::make_pair(stateId, symbol)] = targetId;
-        }
-    }
+    // 整数项编号 + 位集的快速构造；状态编号可能与旧实现不同，但项集语义一致。
+    const std::vector<std::string> terminals =
+        collectTerminalsForLr1(rules, nontermSet, first);
+    std::vector<analysis_lr_fast::CanonState> fastStates;
+    analysis_lr_fast::buildCanonicalLr1(rules, nontermSet, start, first,
+                                        terminals, fastStates, outTransitions);
+    analysis_lr_fast::canonicalToLr1Items(fastStates, rules, terminals,
+                                          outStates);
 }
 
 } // namespace lr1_detail
@@ -508,20 +495,11 @@ bool Analysis::lalrAnalyze(const Grammar &grammar,
     prepareLrAnalysis(grammar, tokens, k_lalrStartSymbol, "lalr", result,
                       nontermSet);
     const std::string &start = result.grammar.start;
-    std::vector<std::set<Lr1Item>> lr1States;
-    std::map<std::pair<int, std::string>, int> lr1Transitions;
-    lr1BuildAutomaton(result.grammar.rules, nontermSet, start, result.first,
-                      lr1States, lr1Transitions);
-    result.lr1StateCount = static_cast<int>(lr1States.size());
-    std::vector<int> stateMap;
-    lalrMergeStates(lr1States, result.lalrStates, stateMap);
-    for (const auto &entry : lr1Transitions)
-    {
-        result.transitions[std::make_pair(
-            stateMap[static_cast<std::size_t>(entry.first.first)],
-            entry.first.second)] =
-            stateMap[static_cast<std::size_t>(entry.second)];
-    }
+    // P3：直接构造 LR(0) 项集 + lookahead 传播，不再先构造规范 LR(1) 自动机。
+    analysis_lr_fast::buildLalr(
+        result.grammar.rules, nontermSet, start, result.first, result.terminals,
+        result.lalrStates, result.transitions);
+    result.lr1StateCount = static_cast<int>(result.lalrStates.size());
     result.hasFollow = false;
     buildLalrStyleTables(result.lalrStates, result.transitions,
                          result.grammar.rules, result.terminals,

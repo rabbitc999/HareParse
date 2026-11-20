@@ -13,3 +13,7 @@ _DD_PROD_COUNT = [
 # 每个非终结符的语义槽位个数（它最长的右部 + 1；第 0 个槽位留空）。
 _DD_PROD_SLOTS = [
             {{ prod_slots }}]
+# 每条产生式的首 Token 集合：None 表示可空产生式，运行时不做剪枝。
+_DD_PROD_FIRST = (
+{% for row in first %}    {% if row.any %}None{% else %}frozenset(({% for t in row.members %}TOKEN_{{ t }}{% if loop_last %}{% else %}, {% endif %}{% endfor %},)){% endif %},
+{% endfor %})

@@ -11,6 +11,8 @@
  */
 
 #include "HareParse/analysis.hpp"
+#include "HareParse/analysis_internal.hpp"
+#include "HareParse/analysis_lr_fast.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -100,20 +102,20 @@ bool Analysis::lr1Analyze(const Grammar &grammar,
     prepareLrAnalysis(grammar, tokens, k_lr1StartSymbol, "lr1", result,
                       nontermSet);
     const std::string &start = result.grammar.start;
-    // 规范 LR(1) 项集族：与 LALR / IELR 用的是同一份构造
-    std::vector<std::set<Lr1Item>> lr1States;
+    // 规范 LR(1) 项集族：整数项编号 + 位集实现，不合并同心状态。
+    std::vector<analysis_lr_fast::CanonState> fastStates;
     std::map<std::pair<int, std::string>, int> lr1Transitions;
-    lr1BuildAutomaton(result.grammar.rules, nontermSet, start, result.first,
-                      lr1States, lr1Transitions);
-    result.lr1StateCount = static_cast<int>(lr1States.size());
-    // 不合并：状态编号与规范 LR(1) 一一对应
-    lr1ToCanonicalStates(lr1States, result.lalrStates);
+    analysis_lr_fast::buildCanonicalLr1(result.grammar.rules, nontermSet, start,
+                                        result.first, result.terminals,
+                                        fastStates, lr1Transitions);
+    result.lr1StateCount = static_cast<int>(fastStates.size());
+    analysis_lr_fast::canonicalToLalrStates(
+        fastStates, result.grammar.rules, result.terminals, false,
+        result.lalrStates);
     result.transitions = lr1Transitions;
-    // 教学对照：同一份 LR(1) 项集族按 core 合并后还剩多少状态
-    std::vector<LalrState> mergedStates;
-    std::vector<int> stateMap;
-    lalrMergeStates(lr1States, mergedStates, stateMap);
-    result.lr1MergedStateCount = static_cast<int>(mergedStates.size());
+    // 教学对照：同一份 LR(1) 项集族按 core 合并后还剩多少状态。
+    result.lr1MergedStateCount =
+        analysis_lr_fast::canonicalMergedStateCount(fastStates);
     result.hasFollow = false;
     buildLalrStyleTables(result.lalrStates, result.transitions,
                          result.grammar.rules, result.terminals,

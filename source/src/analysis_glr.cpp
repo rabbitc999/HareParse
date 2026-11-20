@@ -18,6 +18,8 @@
  */
 
 #include "HareParse/analysis.hpp"
+#include "HareParse/analysis_internal.hpp"
+#include "HareParse/analysis_lr_fast.hpp"
 
 #include <algorithm>
 #include <map>
@@ -125,28 +127,15 @@ bool Analysis::glrAnalyze(const Grammar &grammar,
                       nontermSet);
     const std::string &start = result.grammar.start;
 
-    // 1. 规范 LR(1) 自动机 + 同心合并（与 LALR / IELR 共用）。
-    std::vector<std::set<Lr1Item>> lr1States;
-    std::map<std::pair<int, std::string>, int> lr1Transitions;
-    lr1BuildAutomaton(result.grammar.rules, nontermSet, start, result.first,
-                      lr1States, lr1Transitions);
-    result.lr1StateCount = static_cast<int>(lr1States.size());
-
+    // 1. LALR 项集族（LR(0) + lookahead 传播，快速路径）。
     std::vector<LalrState> states;
-    std::vector<int> stateMap;
-    lalrMergeStates(lr1States, states, stateMap);
+    analysis_lr_fast::buildLalr(
+        result.grammar.rules, nontermSet, start, result.first, result.terminals,
+        states, result.transitions);
+    result.lr1StateCount = static_cast<int>(states.size());
     result.hasFollow = false;
     result.lalrStates = states;
-
-    std::map<std::pair<int, std::string>, int> transitions;
-    for (const auto &entry : lr1Transitions)
-    {
-        transitions[std::make_pair(stateMap[static_cast<std::size_t>(
-                                       entry.first.first)],
-                                   entry.first.second)] =
-            stateMap[static_cast<std::size_t>(entry.second)];
-    }
-    result.transitions = transitions;
+    const auto &transitions = result.transitions;
 
     // 2. 收集每个 ACTION 单元的全部候选动作（此时还不消解冲突）。
     const auto &rules = result.grammar.rules;
