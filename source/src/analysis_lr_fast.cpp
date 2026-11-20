@@ -118,6 +118,7 @@ struct CoreMeta
 {
     LrItem item;                       ///< 对应的 LR(0) 项
     std::string symbol;                ///< 圆点后的符号（圆点在末尾时为空）
+    int symbolId = -1;                 ///< 圆点后符号的字典序编号（无符号为 -1）
     int shiftCore = -1;                ///< 移进该符号后的 core 编号
     std::vector<int> closureTargets;   ///< 圆点后是非终结符时，其各产生式的起始 core
     BitSet spontaneous;                ///< FIRST(β) 中非 ε 的终结符位集
@@ -146,6 +147,23 @@ public:
         for (std::size_t index = 0u; index < cores_.size(); ++index)
         {
             coreIds_.emplace(cores_[index], static_cast<int>(index));
+        }
+        // 「圆点后符号」按字典序编号：规范 LR(1) 每状态的符号处理顺序
+        // 与原来的 std::set<std::string> 完全一致，状态编号因此不变。
+        std::set<std::string> symbols;
+        for (const LrItem &item : cores_)
+        {
+            const std::vector<std::string> &rhs =
+                rules_.at(item.lhs)[static_cast<std::size_t>(item.prod)].rhs;
+            if (static_cast<std::size_t>(item.dot) < rhs.size())
+            {
+                symbols.insert(rhs[static_cast<std::size_t>(item.dot)]);
+            }
+        }
+        symbolNames_.assign(symbols.begin(), symbols.end());
+        for (std::size_t index = 0u; index < symbolNames_.size(); ++index)
+        {
+            symbolIds_.emplace(symbolNames_[index], static_cast<int>(index));
         }
         meta_.resize(cores_.size());
         for (std::size_t index = 0u; index < cores_.size(); ++index)
@@ -177,6 +195,8 @@ public:
     const TokenIndex &tokens() const { return tokens_; }
     /** @brief core 元数据。 @return 引用。 */
     const std::vector<CoreMeta> &meta() const { return meta_; }
+    /** @brief 字典序符号名表。 @return 引用。 */
+    const std::vector<std::string> &symbolNames() const { return symbolNames_; }
     /** @brief core 列表。 @return 引用。 */
     const std::vector<LrItem> &cores() const { return cores_; }
     /** @brief 起始 core 编号。 @return 编号。 */
@@ -203,6 +223,9 @@ private:
             return;
         }
         meta.symbol = rhs[dot];
+        const auto symbolIt = symbolIds_.find(meta.symbol);
+        meta.symbolId =
+            symbolIt == symbolIds_.end() ? -1 : symbolIt->second;
         const auto shifted = coreIds_.find(
             LrItem{meta.item.lhs, meta.item.prod, meta.item.dot + 1});
         meta.shiftCore = shifted == coreIds_.end() ? -1 : shifted->second;
@@ -272,6 +295,8 @@ private:
     TokenIndex tokens_;
     std::vector<LrItem> cores_;
     std::map<LrItem, int> coreIds_;
+    std::unordered_map<std::string, int> symbolIds_;
+    std::vector<std::string> symbolNames_;
     std::vector<CoreMeta> meta_;
     int startCore_ = -1;
     BitSet endBits_;
@@ -311,21 +336,76 @@ std::size_t hashCanon(const CanonState &state)
     return hash;
 }
 
+/**
+ * @brief 规范 LR(1) 构造的复用缓冲区。
+ *
+ * 闭包与 GOTO 每个（状态, 符号）对都要一组 coreCount × 位集宽的临时数组；
+ * 预先分配一次并在调用间清零，避免高频 malloc 与大位集构造。
+ */
+struct CanonScratch
+{
+    std::size_t words;
+    std::vector<BitSet> la;
+    std::vector<BitSet> seeds;
+    std::vector<char> present;
+    std::vector<char> spontaneousDone;
+    std::vector<char> queued;
+    std::vector<char> used;
+    std::deque<int> work;
+    std::vector<std::pair<int, BitSet>> seedList;
+
+    CanonScratch(std::size_t coreCount, std::size_t bitWords)
+        : words(bitWords), la(coreCount), seeds(coreCount),
+          present(coreCount, 0), spontaneousDone(coreCount, 0),
+          queued(coreCount, 0), used(coreCount, 0)
+    {
+        for (BitSet &bits : la)
+        {
+            bits.assign(words, 0u);
+        }
+        for (BitSet &bits : seeds)
+        {
+            bits.assign(words, 0u);
+        }
+    }
+
+    /// @brief 清空闭包工作区（seedList 由 GOTO 持有，不清）。
+    void resetClosure()
+    {
+        for (BitSet &bits : la)
+        {
+            std::fill(bits.begin(), bits.end(), 0u);
+        }
+        std::fill(present.begin(), present.end(), 0);
+        std::fill(spontaneousDone.begin(), spontaneousDone.end(), 0);
+        std::fill(queued.begin(), queued.end(), 0);
+        work.clear();
+    }
+
+    /// @brief 清空 GOTO 工作区。
+    void resetGoto()
+    {
+        for (BitSet &bits : seeds)
+        {
+            std::fill(bits.begin(), bits.end(), 0u);
+        }
+        std::fill(used.begin(), used.end(), 0);
+        seedList.clear();
+    }
+};
+
 /** @brief 规范 LR(1) 闭包：给定的项 + 展望符种子扩展到完整状态。 */
 CanonState canonicalClosure(
     const LrContext &ctx,
-    const std::vector<std::pair<int, BitSet>> &seed)
+    const std::vector<std::pair<int, BitSet>> &seed, CanonScratch &scratch)
 {
     const std::size_t count = ctx.coreCount();
-    std::vector<BitSet> la(count);
-    std::vector<char> present(count, 0);
-    std::vector<char> spontaneousDone(count, 0);
-    std::vector<char> queued(count, 0);
-    for (std::size_t index = 0u; index < count; ++index)
-    {
-        la[index] = ctx.tokens().empty();
-    }
-    std::deque<int> work;
+    scratch.resetClosure();
+    std::vector<BitSet> &la = scratch.la;
+    std::vector<char> &present = scratch.present;
+    std::vector<char> &spontaneousDone = scratch.spontaneousDone;
+    std::vector<char> &queued = scratch.queued;
+    std::deque<int> &work = scratch.work;
     const auto mark = [&](int core)
     {
         if (!queued[static_cast<std::size_t>(core)])
@@ -390,25 +470,22 @@ CanonState canonicalClosure(
 
 /** @brief 规范 LR(1) 的 GOTO 转移。 */
 CanonState canonicalGoto(const LrContext &ctx, const CanonState &state,
-                         const std::string &symbol)
+                         int symbolId, CanonScratch &scratch)
 {
     const std::size_t count = ctx.coreCount();
-    std::vector<BitSet> seeds(count);
-    std::vector<char> used(count, 0);
-    for (std::size_t index = 0u; index < count; ++index)
-    {
-        seeds[index] = ctx.tokens().empty();
-    }
+    scratch.resetGoto();
+    std::vector<BitSet> &seeds = scratch.seeds;
+    std::vector<char> &used = scratch.used;
     for (const auto &entry : state.items)
     {
         const CoreMeta &meta = ctx.meta()[static_cast<std::size_t>(entry.first)];
-        if (meta.shiftCore >= 0 && meta.symbol == symbol)
+        if (meta.shiftCore >= 0 && meta.symbolId == symbolId)
         {
             orInto(seeds[static_cast<std::size_t>(meta.shiftCore)], entry.second);
             used[static_cast<std::size_t>(meta.shiftCore)] = 1;
         }
     }
-    std::vector<std::pair<int, BitSet>> seedList;
+    std::vector<std::pair<int, BitSet>> &seedList = scratch.seedList;
     for (std::size_t core = 0u; core < count; ++core)
     {
         if (used[core] && anyBit(seeds[core]))
@@ -420,7 +497,7 @@ CanonState canonicalGoto(const LrContext &ctx, const CanonState &state,
     {
         return {};
     }
-    return canonicalClosure(ctx, seedList);
+    return canonicalClosure(ctx, seedList, scratch);
 }
 
 } // namespace
@@ -561,8 +638,9 @@ void buildCanonicalLr1(
     {
         return;
     }
+    CanonScratch scratch(ctx.coreCount(), ctx.tokens().empty().size());
     const CanonState initial =
-        canonicalClosure(ctx, {{ctx.startCore(), ctx.endBits()}});
+        canonicalClosure(ctx, {{ctx.startCore(), ctx.endBits()}}, scratch);
     outStates.push_back(initial);
     std::unordered_map<std::size_t, std::vector<int>> buckets;
     buckets[hashCanon(initial)].push_back(0);
@@ -570,22 +648,30 @@ void buildCanonicalLr1(
     for (std::size_t cursor = 0u; cursor < pending.size(); ++cursor)
     {
         const int stateId = pending[cursor];
-        std::set<std::string> symbols;
+        // 用整数符号编号收集本状态的出边符号；遍历顺序与字典序一致。
+        const std::vector<std::string> &symbolNames = ctx.symbolNames();
+        std::vector<char> seen(symbolNames.size(), 0);
         for (const auto &entry :
              outStates[static_cast<std::size_t>(stateId)].items)
         {
-            const CoreMeta &meta =
-                ctx.meta()[static_cast<std::size_t>(entry.first)];
-            if (!meta.symbol.empty())
+            const int symbolId =
+                ctx.meta()[static_cast<std::size_t>(entry.first)].symbolId;
+            if (symbolId >= 0)
             {
-                symbols.insert(meta.symbol);
+                seen[static_cast<std::size_t>(symbolId)] = 1;
             }
         }
-        for (const std::string &symbol : symbols)
+        for (std::size_t symbolIndex = 0u; symbolIndex < seen.size();
+             ++symbolIndex)
         {
-            const CanonState target =
-                canonicalGoto(ctx, outStates[static_cast<std::size_t>(stateId)],
-                              symbol);
+            if (!seen[symbolIndex])
+            {
+                continue;
+            }
+            const std::string &symbol = symbolNames[symbolIndex];
+            const CanonState target = canonicalGoto(
+                ctx, outStates[static_cast<std::size_t>(stateId)],
+                static_cast<int>(symbolIndex), scratch);
             if (target.items.empty())
             {
                 continue;

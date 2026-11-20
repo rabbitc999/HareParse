@@ -10,6 +10,7 @@
 #include <cctype>
 #include <map>
 #include <set>
+#include <unordered_map>
 #include <vector>
 
 #include "HareParse/code_gen.hpp"
@@ -931,26 +932,57 @@ std::string generatorTokenNamesCpp17(const std::vector<std::string> &terminals,
 std::string generatorLrTablesCpp17(const AnalysisResult &analysis)
 {
     const std::size_t stateCount = analysis.stateCount();
+    const std::size_t termCount = analysis.terminals.size();
+    const std::size_t nontermCount = analysis.nonterms.size();
+    // 单层 ACTION / GOTO 改为整数键查表；输出顺序仍按 terminals / nonterms 原序。
+    std::unordered_map<std::string, int> terminalId;
+    terminalId.reserve(termCount);
+    for (std::size_t index = 0; index < termCount; ++index)
+    {
+        terminalId[analysis.terminals[index]] = static_cast<int>(index);
+    }
+    std::unordered_map<long long, const LrAction *> actionById;
+    actionById.reserve(analysis.action.size());
+    for (const auto &entry : analysis.action)
+    {
+        const auto column = terminalId.find(entry.first.second);
+        if (column == terminalId.end())
+        {
+            continue;
+        }
+        actionById[static_cast<long long>(entry.first.first) *
+                       static_cast<long long>(termCount) + column->second] =
+            &entry.second;
+    }
+    std::unordered_map<long long, int> gotoById;
+    gotoById.reserve(analysis.gotoTable.size());
+    for (const auto &entry : analysis.gotoTable)
+    {
+        gotoById[static_cast<long long>(entry.first.first) *
+                     static_cast<long long>(nontermCount) +
+                 entry.first.second] = entry.second;
+    }
     std::vector<std::vector<std::string>> actionRows;
     for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
     {
         std::vector<std::string> cells;
-        for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
+        for (std::size_t index = 0; index < termCount; ++index)
         {
-            const auto found = analysis.action.find(
-                std::make_pair(static_cast<int>(stateId),
-                               analysis.terminals[index]));
-            if (found == analysis.action.end())
+            const auto found = actionById.find(
+                static_cast<long long>(stateId) *
+                    static_cast<long long>(termCount) +
+                static_cast<long long>(index));
+            if (found == actionById.end())
             {
                 cells.push_back("0");
             }
-            else if (found->second.kind == LrAction::Kind::Shift)
+            else if (found->second->kind == LrAction::Kind::Shift)
             {
-                cells.push_back(std::to_string(found->second.value + 1));
+                cells.push_back(std::to_string(found->second->value + 1));
             }
-            else if (found->second.kind == LrAction::Kind::Reduce)
+            else if (found->second->kind == LrAction::Kind::Reduce)
             {
-                cells.push_back(std::to_string(-found->second.value - 1));
+                cells.push_back(std::to_string(-found->second->value - 1));
             }
             else
             {
@@ -963,12 +995,13 @@ std::string generatorLrTablesCpp17(const AnalysisResult &analysis)
     for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
     {
         std::vector<std::string> cells;
-        for (std::size_t index = 0; index < analysis.nonterms.size(); ++index)
+        for (std::size_t index = 0; index < nontermCount; ++index)
         {
-            const auto found = analysis.gotoTable.find(
-                std::make_pair(static_cast<int>(stateId),
-                               static_cast<int>(index)));
-            cells.push_back((found == analysis.gotoTable.end())
+            const auto found = gotoById.find(
+                static_cast<long long>(stateId) *
+                    static_cast<long long>(nontermCount) +
+                static_cast<long long>(index));
+            cells.push_back((found == gotoById.end())
                                 ? std::string("0xFFFFu")
                                 : std::to_string(found->second));
         }
@@ -999,6 +1032,16 @@ std::string generatorLrTablesCpp17(const AnalysisResult &analysis)
     {
         terminalIds[analysis.terminals[index]] = static_cast<int>(index);
     }
+    // 展望符列文本只依赖列号，预先算一次，避免按状态重复拼接字符串。
+    std::vector<std::string> lookaheadKeys(columnCount);
+    for (std::size_t column = 0; column < columnCount; ++column)
+    {
+        if (column < analysis.lookaheadColumns.size())
+        {
+            lookaheadKeys[column] =
+                lookaheadKeyOf(analysis.lookaheadColumns[column]);
+        }
+    }
     std::vector<std::vector<std::string>> reduceRows;
     for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
     {
@@ -1010,8 +1053,7 @@ std::string generatorLrTablesCpp17(const AnalysisResult &analysis)
                 cells.push_back("0");
                 continue;
             }
-            const std::string key =
-                lookaheadKeyOf(analysis.lookaheadColumns[column]);
+            const std::string &key = lookaheadKeys[column];
             const auto found = analysis.action.find(
                 std::make_pair(static_cast<int>(stateId), key));
             if (found == analysis.action.end())

@@ -15,6 +15,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <unordered_map>
 
 #include "HareParse/action_translator.hpp"
 #include "HareParse/code_gen.hpp"
@@ -1173,6 +1174,36 @@ std::string generatorLlTablesC(const AnalysisResult &analysis,
 std::string generatorLrTablesC(const AnalysisResult &analysis)
 {
     const std::size_t stateCount = analysis.stateCount();
+    const std::size_t termCount = analysis.terminals.size();
+    const std::size_t nontermCount = analysis.nonterms.size();
+    // 单层 ACTION / GOTO 改为整数键查表；输出顺序仍按 terminals / nonterms 原序。
+    std::unordered_map<std::string, int> terminalId;
+    terminalId.reserve(termCount);
+    for (std::size_t index = 0; index < termCount; ++index)
+    {
+        terminalId[analysis.terminals[index]] = static_cast<int>(index);
+    }
+    std::unordered_map<long long, const LrAction *> actionById;
+    actionById.reserve(analysis.action.size());
+    for (const auto &entry : analysis.action)
+    {
+        const auto column = terminalId.find(entry.first.second);
+        if (column == terminalId.end())
+        {
+            continue;
+        }
+        actionById[static_cast<long long>(entry.first.first) *
+                       static_cast<long long>(termCount) + column->second] =
+            &entry.second;
+    }
+    std::unordered_map<long long, int> gotoById;
+    gotoById.reserve(analysis.gotoTable.size());
+    for (const auto &entry : analysis.gotoTable)
+    {
+        gotoById[static_cast<long long>(entry.first.first) *
+                     static_cast<long long>(nontermCount) +
+                 entry.first.second] = entry.second;
+    }
     // 表体全部在模板里（source/templates/c99_lr_tables.c.tmpl）：这里只把每个
     // 单元格算成现成的文本（数字、`INT32_MAX`、`UINT16_MAX`），行与分隔符交给
     // 模板的 `{% for %}`。
@@ -1181,24 +1212,26 @@ std::string generatorLrTablesC(const AnalysisResult &analysis)
     for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
     {
         LrTableRow row;
-        row.cells.reserve(analysis.terminals.size());
-        for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
+        row.cells.reserve(termCount);
+        for (std::size_t index = 0; index < termCount; ++index)
         {
-            const auto found = analysis.action.find(std::make_pair(
-                static_cast<int>(stateId), analysis.terminals[index]));
-            if (found == analysis.action.end())
+            const auto found = actionById.find(
+                static_cast<long long>(stateId) *
+                    static_cast<long long>(termCount) +
+                static_cast<long long>(index));
+            if (found == actionById.end())
             {
                 row.cells.emplace_back("0");
             }
-            else if (found->second.kind == LrAction::Kind::Shift)
+            else if (found->second->kind == LrAction::Kind::Shift)
             {
                 row.cells.emplace_back(
-                    std::to_string(found->second.value + 1));
+                    std::to_string(found->second->value + 1));
             }
-            else if (found->second.kind == LrAction::Kind::Reduce)
+            else if (found->second->kind == LrAction::Kind::Reduce)
             {
                 row.cells.emplace_back(
-                    std::to_string(-found->second.value - 1));
+                    std::to_string(-found->second->value - 1));
             }
             else
             {
@@ -1212,12 +1245,14 @@ std::string generatorLrTablesC(const AnalysisResult &analysis)
     for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
     {
         LrTableRow row;
-        row.cells.reserve(analysis.nonterms.size());
-        for (std::size_t index = 0; index < analysis.nonterms.size(); ++index)
+        row.cells.reserve(nontermCount);
+        for (std::size_t index = 0; index < nontermCount; ++index)
         {
-            const auto found = analysis.gotoTable.find(std::make_pair(
-                static_cast<int>(stateId), static_cast<int>(index)));
-            row.cells.push_back(found == analysis.gotoTable.end()
+            const auto found = gotoById.find(
+                static_cast<long long>(stateId) *
+                    static_cast<long long>(nontermCount) +
+                static_cast<long long>(index));
+            row.cells.push_back(found == gotoById.end()
                                     ? std::string("UINT16_MAX")
                                     : std::to_string(found->second));
         }
@@ -1255,6 +1290,13 @@ std::string generatorLrTablesC(const AnalysisResult &analysis)
         {
             terminalIds[analysis.terminals[index]] = static_cast<int>(index);
         }
+        // 列文本只依赖列号，预计算后按状态复用。
+        std::vector<std::string> lookaheadKeys(columnCount);
+        for (std::size_t column = 0; column < columnCount; ++column)
+        {
+            lookaheadKeys[column] =
+                lookaheadKeyOf(analysis.lookaheadColumns[column]);
+        }
         reduce.reserve(stateCount);
         for (std::size_t stateId = 0; stateId < stateCount; ++stateId)
         {
@@ -1262,8 +1304,7 @@ std::string generatorLrTablesC(const AnalysisResult &analysis)
             row.cells.reserve(columnCount);
             for (std::size_t column = 0; column < columnCount; ++column)
             {
-                const std::string key =
-                    lookaheadKeyOf(analysis.lookaheadColumns[column]);
+                const std::string &key = lookaheadKeys[column];
                 const auto found = analysis.action.find(std::make_pair(
                     static_cast<int>(stateId), key));
                 if ((found != analysis.action.end()) &&

@@ -484,7 +484,8 @@ bool Analysis::ielrAnalyze(const Grammar &grammar,
     std::vector<int> ancestorOfBlock(static_cast<std::size_t>(blockCount), -1);
     const auto refreshAncestors = [&]()
     {
-        std::fill(ancestorOfBlock.begin(), ancestorOfBlock.end(), -1);
+        // 块数会在每次拆分后增长，必须按当前 blockCount 重新分配而不是只 fill。
+        ancestorOfBlock.assign(static_cast<std::size_t>(blockCount), -1);
         for (std::size_t stateId = 0; stateId < blockOf.size(); ++stateId)
         {
             const int block = blockOf[stateId];

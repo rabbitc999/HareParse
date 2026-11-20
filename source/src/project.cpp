@@ -3832,12 +3832,6 @@ bool generateCustomProject(const ProjectRequest &request,
     {
         return false;
     }
-    const std::string tablesText =
-        isLrMode(mode)
-            ? CodeGenC99::lrTables(analysis)
-            : CodeGenC99::llTables(analysis, static_cast<int>(terminals.size()),
-                                static_cast<int>(nonterms.size()));
-
     const std::optional<std::string> userHeader =
         CodeGenC99::customUserH(userCodeWithLines, unionBodyWithLines, valueType);
     const std::map<std::string, std::string> *symbolMember =
@@ -3869,6 +3863,13 @@ bool generateCustomProject(const ProjectRequest &request,
                                     userCodeWithLines, unionBodyWithLines,
                                     valueType, out, error);
     }
+    // C99 的 ACTION/GOTO 文本只有 C 产物用得到；其它语言有各自的后端，
+    // 放到分派之后算，避免 C++17 / Python 等路径重复扫描整张 LR 表。
+    const std::string tablesText =
+        isLrMode(mode)
+            ? CodeGenC99::lrTables(analysis)
+            : CodeGenC99::llTables(analysis, static_cast<int>(terminals.size()),
+                                static_cast<int>(nonterms.size()));
     std::vector<std::string> files = k_projectFiles;
     if (!userHeader.has_value())
     {
