@@ -1066,6 +1066,32 @@ std::string generatorLlTablesC(const AnalysisResult &analysis,
     }
     // 表体全部在模板里（source/templates/c99_ll_tables.c.tmpl）：这里只把每个
     // 单元格算成现成的文本，行与分隔符交给模板的 `{% for %}`。
+    // 表键改成整数后一次建索引，避免 rows × columns 次字符串对查找。
+    const std::size_t columnCount = columnKeys.empty() ? 1u : columnKeys.size();
+    std::unordered_map<std::string, int> nontermIds;
+    for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
+    {
+        nontermIds[analysis.nonterms[row]] = static_cast<int>(row);
+    }
+    std::unordered_map<std::string, int> columnIds;
+    for (std::size_t column = 0; column < columnKeys.size(); ++column)
+    {
+        columnIds[columnKeys[column]] = static_cast<int>(column);
+    }
+    std::unordered_map<long long, int> tableByKey;
+    for (const auto &entry : analysis.table)
+    {
+        const auto rowIt = nontermIds.find(entry.first.first);
+        const auto columnIt = columnIds.find(entry.first.second);
+        if ((rowIt == nontermIds.end()) || (columnIt == columnIds.end()))
+        {
+            continue;
+        }
+        const long long key = static_cast<long long>(rowIt->second) *
+                                  static_cast<long long>(columnCount) +
+                              static_cast<long long>(columnIt->second);
+        tableByKey[key] = entry.second;
+    }
     std::vector<LrTableRow> table;
     table.reserve(analysis.nonterms.size());
     for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
@@ -1074,9 +1100,11 @@ std::string generatorLlTablesC(const AnalysisResult &analysis,
         cells.cells.reserve(columnKeys.size());
         for (std::size_t column = 0; column < columnKeys.size(); ++column)
         {
-            const auto found = analysis.table.find(
-                std::make_pair(analysis.nonterms[row], columnKeys[column]));
-            cells.cells.push_back(found == analysis.table.end()
+            const long long key = static_cast<long long>(row) *
+                                      static_cast<long long>(columnCount) +
+                                  static_cast<long long>(column);
+            const auto found = tableByKey.find(key);
+            cells.cells.push_back(found == tableByKey.end()
                                       ? std::string("-1")
                                       : std::to_string(found->second));
         }
@@ -1095,7 +1123,7 @@ std::string generatorLlTablesC(const AnalysisResult &analysis,
     std::vector<std::string> columns;
     if (hasLookahead)
     {
-        std::map<std::string, int> terminalIds;
+        std::unordered_map<std::string, int> terminalIds;
         for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
         {
             terminalIds[analysis.terminals[index]] = static_cast<int>(index);
@@ -1131,20 +1159,36 @@ std::string generatorLlTablesC(const AnalysisResult &analysis,
     if (hasFollow)
     {
         follow.reserve(analysis.nonterms.size());
+        // 先把 FOLLOW 集合摊成按终结符下标的位图，单元格只做 O(1) 查表。
+        std::vector<std::vector<char>> followMasks(analysis.nonterms.size());
         for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
         {
+            followMasks[row].assign(analysis.terminals.size(), 0);
             const auto followIt = analysis.follow.find(analysis.nonterms[row]);
-            const std::set<std::string> *member =
-                followIt != analysis.follow.end() ? &followIt->second : nullptr;
+            if (followIt != analysis.follow.end())
+            {
+                for (const std::string &token : followIt->second)
+                {
+                    const auto terminalIt = std::find(
+                        analysis.terminals.begin(), analysis.terminals.end(),
+                        token);
+                    if (terminalIt != analysis.terminals.end())
+                    {
+                        followMasks[row][static_cast<std::size_t>(
+                            terminalIt - analysis.terminals.begin())] = 1;
+                    }
+                }
+            }
+        }
+        for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
+        {
             LrTableRow cells;
             cells.cells.reserve(analysis.terminals.size());
             for (std::size_t column = 0; column < analysis.terminals.size();
                  ++column)
             {
-                const bool inFollow =
-                    (member != nullptr) &&
-                    (member->count(analysis.terminals[column]) != 0u);
-                cells.cells.push_back(inFollow ? "1u" : "0u");
+                cells.cells.push_back(followMasks[row][column] != 0 ? "1u"
+                                                                   : "0u");
             }
             follow.push_back(std::move(cells));
         }

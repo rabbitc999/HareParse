@@ -704,6 +704,25 @@ std::set<std::string> extendLookahead(const std::set<std::string> &prefixes,
                                       const std::string &tail, int k);
 
 /**
+ * @brief 用整数 k 元组一次性算出所有产生式的 SELECT_k 集合。
+ *
+ * 与逐条调用 firstKOfSequence + extendLookahead 等价，但 FIRST_k / FOLLOW_k
+ * 只在开头编码一次，卷积过程全在紧凑键上完成，最后仍解码回字符串集合，
+ * 因此表项顺序与冲突文本保持不变。k 超出紧凑键上限时由调用方走字符串回退。
+ * @param rules 规则表（决定产生式的遍历顺序）。
+ * @param nonterms 非终结符列表。
+ * @param firstK FIRST_k 表（computeFirstK 的结果）。
+ * @param followK FOLLOW_k 表（computeFollowK 的结果）。
+ * @param k 展望符长度（1 < k <= 8）。
+ * @return 与规则表产生式顺序一致的 SELECT_k 集合列表。
+ */
+std::vector<std::set<std::string>> selectSetsKCompact(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::vector<std::string> &nonterms,
+    const std::map<std::string, std::set<std::string>> &firstK,
+    const std::map<std::string, std::set<std::string>> &followK, int k);
+
+/**
  * @brief LR(k) 项集闭包。
  * @param items 初始项集。
  * @param rules 规则表。

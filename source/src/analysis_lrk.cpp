@@ -609,6 +609,71 @@ static CompactKeySet compactFirstSequence(
     return current;
 }
 
+std::vector<std::set<std::string>> selectSetsKCompact(
+    const std::map<std::string, std::vector<Production>> &rules,
+    const std::vector<std::string> &nonterms,
+    const std::map<std::string, std::set<std::string>> &firstK,
+    const std::map<std::string, std::set<std::string>> &followK, int k)
+{
+    CompactKeyCodec codec(k);
+    std::map<std::string, int> indexOf;
+    for (std::size_t index = 0; index < nonterms.size(); ++index)
+    {
+        indexOf[nonterms[index]] = static_cast<int>(index);
+    }
+    std::vector<CompactKeySet> firstCompact(nonterms.size());
+    std::vector<CompactKeySet> followCompact(nonterms.size());
+    for (std::size_t index = 0; index < nonterms.size(); ++index)
+    {
+        const auto firstIt = firstK.find(nonterms[index]);
+        if (firstIt != firstK.end())
+        {
+            for (const std::string &key : firstIt->second)
+            {
+                firstCompact[index].insert(codec.encode(key));
+            }
+        }
+        const auto followIt = followK.find(nonterms[index]);
+        if (followIt != followK.end())
+        {
+            for (const std::string &key : followIt->second)
+            {
+                followCompact[index].insert(codec.encode(key));
+            }
+        }
+    }
+    std::vector<std::set<std::string>> result;
+    for (const auto &rule : rules)
+    {
+        const auto rowIt = indexOf.find(rule.first);
+        if (rowIt == indexOf.end())
+        {
+            continue;
+        }
+        const std::size_t row = static_cast<std::size_t>(rowIt->second);
+        for (const Production &production : rule.second)
+        {
+            const CompactKeySet alpha = compactFirstSequence(
+                production.rhs, k, indexOf, firstCompact, codec);
+            CompactKeySet selected;
+            for (const CompactKey &prefix : alpha)
+            {
+                for (const CompactKey &tail : followCompact[row])
+                {
+                    selected.insert(codec.concat(prefix, tail));
+                }
+            }
+            std::set<std::string> decoded;
+            for (const CompactKey &key : selected)
+            {
+                decoded.insert(codec.decode(key));
+            }
+            result.push_back(std::move(decoded));
+        }
+    }
+    return result;
+}
+
 /**
  * @brief 非终结符下标与产生式的紧凑描述（非终结符编号取负保存）。
  */

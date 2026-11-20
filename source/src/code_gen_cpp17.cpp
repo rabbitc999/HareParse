@@ -1145,14 +1145,42 @@ std::string generatorLlTablesCpp17(const AnalysisResult &analysis)
         }
     }
     std::vector<std::vector<std::string>> tableRows;
+    // 表键改成整数后一次建索引，避免 rows × columns 次字符串对查找。
+    const std::size_t columnCount = columnKeys.empty() ? 1u : columnKeys.size();
+    std::unordered_map<std::string, int> nontermIds;
+    for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
+    {
+        nontermIds[analysis.nonterms[row]] = static_cast<int>(row);
+    }
+    std::unordered_map<std::string, int> columnIds;
+    for (std::size_t column = 0; column < columnKeys.size(); ++column)
+    {
+        columnIds[columnKeys[column]] = static_cast<int>(column);
+    }
+    std::unordered_map<long long, int> tableByKey;
+    for (const auto &entry : analysis.table)
+    {
+        const auto rowIt = nontermIds.find(entry.first.first);
+        const auto columnIt = columnIds.find(entry.first.second);
+        if ((rowIt == nontermIds.end()) || (columnIt == columnIds.end()))
+        {
+            continue;
+        }
+        const long long key = static_cast<long long>(rowIt->second) *
+                                  static_cast<long long>(columnCount) +
+                              static_cast<long long>(columnIt->second);
+        tableByKey[key] = entry.second;
+    }
     for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
     {
         std::vector<std::string> cells;
         for (std::size_t column = 0; column < columnKeys.size(); ++column)
         {
-            const auto found = analysis.table.find(
-                std::make_pair(analysis.nonterms[row], columnKeys[column]));
-            cells.push_back((found == analysis.table.end())
+            const long long key = static_cast<long long>(row) *
+                                      static_cast<long long>(columnCount) +
+                                  static_cast<long long>(column);
+            const auto found = tableByKey.find(key);
+            cells.push_back((found == tableByKey.end())
                                 ? std::string("-1")
                                 : std::to_string(found->second));
         }
@@ -1164,7 +1192,7 @@ std::string generatorLlTablesCpp17(const AnalysisResult &analysis)
         leftEmpty.push_back((production.transform == "left_empty") ? "1u"
                                                                   : "0u");
     }
-    std::map<std::string, int> terminalIds;
+    std::unordered_map<std::string, int> terminalIds;
     for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
     {
         terminalIds[analysis.terminals[index]] = static_cast<int>(index);
@@ -1204,19 +1232,35 @@ std::string generatorLlTablesCpp17(const AnalysisResult &analysis)
     std::vector<std::vector<std::string>> followRows;
     if (k != 0)
     {
+        // 先把 FOLLOW 集合摊成按终结符下标的位图，单元格只做 O(1) 查表。
+        std::vector<std::vector<char>> followMasks(analysis.nonterms.size());
         for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
         {
+            followMasks[row].assign(analysis.terminals.size(), 0);
             const auto followIt = analysis.follow.find(analysis.nonterms[row]);
-            const std::set<std::string> *follow =
-                followIt != analysis.follow.end() ? &followIt->second : nullptr;
+            if (followIt != analysis.follow.end())
+            {
+                for (const std::string &token : followIt->second)
+                {
+                    const auto terminalIt = std::find(
+                        analysis.terminals.begin(), analysis.terminals.end(),
+                        token);
+                    if (terminalIt != analysis.terminals.end())
+                    {
+                        followMasks[row][static_cast<std::size_t>(
+                            terminalIt - analysis.terminals.begin())] = 1;
+                    }
+                }
+            }
+        }
+        for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
+        {
             std::vector<std::string> cells;
             for (std::size_t column = 0; column < analysis.terminals.size();
                  ++column)
             {
-                const bool member =
-                    (follow != nullptr) &&
-                    (follow->count(analysis.terminals[column]) != 0u);
-                cells.push_back(member ? "true" : "false");
+                cells.push_back(followMasks[row][column] != 0 ? "true"
+                                                              : "false");
             }
             followRows.push_back(std::move(cells));
         }
@@ -1413,29 +1457,37 @@ std::string generatorDdTablesCpp17(const AnalysisResult &analysis)
     std::vector<std::string> prodCounts;
     std::vector<std::string> prodSlots;
     const std::size_t total = analysis.productions.size();
-    for (const std::string &nonterm : analysis.nonterms)
+    std::unordered_map<std::string, int> nontermIds;
+    for (std::size_t index = 0; index < analysis.nonterms.size(); ++index)
     {
-        std::size_t first = total;
-        std::size_t count = 0u;
-        std::size_t maxRhs = 0u;
-        for (std::size_t index = 0u; index < total; ++index)
+        nontermIds[analysis.nonterms[index]] = static_cast<int>(index);
+    }
+    std::vector<std::size_t> firsts(analysis.nonterms.size(), total);
+    std::vector<std::size_t> counts(analysis.nonterms.size(), 0u);
+    std::vector<std::size_t> maxRhsList(analysis.nonterms.size(), 0u);
+    for (std::size_t index = 0u; index < total; ++index)
+    {
+        const Production &production = analysis.productions[index];
+        const auto found = nontermIds.find(production.lhs);
+        if (found == nontermIds.end())
         {
-            const Production &production = analysis.productions[index];
-            if (production.lhs != nonterm)
-            {
-                continue;
-            }
-            if (first == total)
-            {
-                first = index;
-            }
-            ++count;
-            maxRhs = std::max(maxRhs, production.rhs.size());
+            continue;
         }
-        prodStarts.push_back(std::to_string(first == total ? 0u : first));
-        prodCounts.push_back(std::to_string(count));
+        const std::size_t row = static_cast<std::size_t>(found->second);
+        if (firsts[row] == total)
+        {
+            firsts[row] = index;
+        }
+        ++counts[row];
+        maxRhsList[row] = std::max(maxRhsList[row], production.rhs.size());
+    }
+    for (std::size_t row = 0; row < analysis.nonterms.size(); ++row)
+    {
+        prodStarts.push_back(std::to_string(firsts[row] == total ? 0u
+                                                                 : firsts[row]));
+        prodCounts.push_back(std::to_string(counts[row]));
         // 语义槽位：第 0 个留空，所以是「最长的右部 + 1」
-        prodSlots.push_back(std::to_string(maxRhs + 1u));
+        prodSlots.push_back(std::to_string(maxRhsList[row] + 1u));
     }
     // 排版（`Nu` 与分隔符）在 `cpp17_dd_tables.cpp.tmpl` 里
     return tmpl::renderValues(
@@ -1452,9 +1504,12 @@ std::string generatorDdTablesCpp17(const AnalysisResult &analysis)
  */
 std::string generatorTreeTablesCpp17(const AnalysisResult &analysis)
 {
-    std::set<std::string> terminalSet(analysis.terminals.begin(),
-                                      analysis.terminals.end());
-    std::map<std::string, int> nontermIds;
+    std::unordered_map<std::string, int> terminalIds;
+    for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
+    {
+        terminalIds[analysis.terminals[index]] = static_cast<int>(index);
+    }
+    std::unordered_map<std::string, int> nontermIds;
     for (std::size_t index = 0; index < analysis.nonterms.size(); ++index)
     {
         nontermIds[analysis.nonterms[index]] = static_cast<int>(index);
@@ -1469,13 +1524,10 @@ std::string generatorTreeTablesCpp17(const AnalysisResult &analysis)
         prodLengths.push_back(std::to_string(production.rhs.size()));
         for (const std::string &symbol : production.rhs)
         {
-            if (terminalSet.count(symbol) != 0u)
+            const auto terminalIt = terminalIds.find(symbol);
+            if (terminalIt != terminalIds.end())
             {
-                const auto found =
-                    std::find(analysis.terminals.begin(),
-                              analysis.terminals.end(), symbol);
-                prodSymbols.push_back(
-                    std::to_string(found - analysis.terminals.begin()));
+                prodSymbols.push_back(std::to_string(terminalIt->second));
             }
             else
             {
@@ -2417,7 +2469,7 @@ bool CodeGenCpp17::parserCpp(const ProjectRequest &request,
         expectedTokensByRow(analysis);
     std::string expectedTableText;
     {
-        std::map<std::string, int> expectedIds;
+        std::unordered_map<std::string, int> expectedIds;
         for (std::size_t index = 0; index < analysis.terminals.size(); ++index)
         {
             expectedIds[analysis.terminals[index]] = static_cast<int>(index);

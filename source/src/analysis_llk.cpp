@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 #include "HareParse/analysis_internal.hpp"
 #include "HareParse/grammar_loader.hpp"
@@ -126,8 +127,28 @@ bool Analysis::llkAnalyze(const Grammar &grammar,
     result.followK = lrk_detail::computeFollowK(
         result.grammar.start, result.grammar.rules, result.nonterms, k,
         result.firstK);
+    std::size_t productionCount = 0u;
+    for (const auto &rule : result.grammar.rules)
+    {
+        productionCount += rule.second.size();
+    }
+    std::vector<std::set<std::string>> compactSelects;
+    const bool useCompactSelect =
+        (k >= 2) && (k <= 8) &&
+        (result.grammar.rules.size() == result.nonterms.size());
+    if (useCompactSelect)
+    {
+        compactSelects = lrk_detail::selectSetsKCompact(
+            result.grammar.rules, result.nonterms, result.firstK,
+            result.followK, k);
+        if (compactSelects.size() != productionCount)
+        {
+            compactSelects.clear();
+        }
+    }
     std::map<std::pair<std::string, std::string>, int> table;
     std::set<std::string> columns;
+    std::size_t selectIndex = 0u;
     for (const auto &rule : result.grammar.rules)
     {
         const std::string &lhs = rule.first;
@@ -138,8 +159,12 @@ bool Analysis::llkAnalyze(const Grammar &grammar,
             entry.lhs = lhs;
             const int prodId = entry.id;
             result.productions.push_back(entry);
-            const std::set<std::string> selected = selectSetK(
-                entry, lhs, k, nontermSet, result.firstK, result.followK);
+            const std::set<std::string> selected =
+                compactSelects.empty()
+                    ? selectSetK(entry, lhs, k, nontermSet, result.firstK,
+                                 result.followK)
+                    : compactSelects[selectIndex];
+            ++selectIndex;
             for (const std::string &token : selected)
             {
                 const auto key = std::make_pair(lhs, token);
@@ -268,22 +293,32 @@ std::string formatLlkReport(const AnalysisResult &analysis)
     }
     lines.push_back("");
     lines.push_back("[SELECT_" + std::to_string(k) + " 预测分析表]");
+    // 表按 (非终结符, 列) 有序；一次建倒排索引，避免 N × |table| 次全表扫描。
+    std::unordered_map<std::string,
+                       std::vector<const std::map<
+                           std::pair<std::string, std::string>, int>::value_type *>>
+        entriesByNonterm;
+    for (const auto &entry : analysis.table)
+    {
+        entriesByNonterm[entry.first.first].push_back(&entry);
+    }
     for (const std::string &name : analysis.nonterms)
     {
-        for (const auto &entry : analysis.table)
+        const auto found = entriesByNonterm.find(name);
+        if (found == entriesByNonterm.end())
         {
-            if (entry.first.first != name)
-            {
-                continue;
-            }
+            continue;
+        }
+        for (const auto *entry : found->second)
+        {
             const Production &production =
-                analysis.productions[static_cast<std::size_t>(entry.second)];
+                analysis.productions[static_cast<std::size_t>(entry->second)];
             lines.push_back(
                 "M[" + name + ", " +
-                (entry.first.second.empty()
+                (entry->first.second.empty()
                      ? std::string("ε")
-                     : lookaheadKeyText(entry.first.second)) +
-                "] = P" + std::to_string(entry.second) + "（" + name + " -> " +
+                     : lookaheadKeyText(entry->first.second)) +
+                "] = P" + std::to_string(entry->second) + "（" + name + " -> " +
                 rhsText(production.rhs) + "）");
         }
     }

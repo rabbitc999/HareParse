@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "HareParse/analysis_internal.hpp"
 #include "HareParse/grammar_loader.hpp"
@@ -229,9 +230,10 @@ std::string lr0StateText(
 std::vector<std::string> uniqueInOrder(const std::vector<std::string> &values)
 {
     std::vector<std::string> result;
+    std::unordered_set<std::string> seen;
     for (const std::string &value : values)
     {
-        if (std::find(result.begin(), result.end(), value) == result.end())
+        if (seen.insert(value).second)
         {
             result.push_back(value);
         }
@@ -1486,29 +1488,40 @@ std::vector<std::vector<std::string>> expectedTokensByRow(
         }
         rows.assign(analysis.nonterms.size(),
                     std::vector<std::string>());
+        std::unordered_map<std::string, std::size_t> nontermIds;
+        for (std::size_t index = 0; index < analysis.nonterms.size(); ++index)
+        {
+            nontermIds[analysis.nonterms[index]] = index;
+        }
+        std::vector<std::unordered_set<std::string>> seen(rows.size());
+        // 同一个列键会在多行重复出现，只拆一次。
+        std::unordered_map<std::string, std::vector<std::string>> symbolsCache;
         for (const auto &entry : analysis.table)
         {
-            const std::string &row = entry.first.first;
-            const auto found =
-                std::find(analysis.nonterms.begin(), analysis.nonterms.end(),
-                          row);
-            if (found == analysis.nonterms.end())
+            const auto rowIt = nontermIds.find(entry.first.first);
+            if (rowIt == nontermIds.end())
             {
                 continue;
             }
-            const std::size_t index =
-                static_cast<std::size_t>(found - analysis.nonterms.begin());
-            std::vector<std::string> symbols =
-                lookaheadKeySymbols(entry.first.second);
+            std::vector<std::string> symbols;
+            const auto cached = symbolsCache.find(entry.first.second);
+            if (cached != symbolsCache.end())
+            {
+                symbols = cached->second;
+            }
+            else
+            {
+                symbols = lookaheadKeySymbols(entry.first.second);
+                symbolsCache.emplace(entry.first.second, symbols);
+            }
             if (symbols.empty())
             {
                 continue;
             }
-            std::vector<std::string> &target = rows[index];
-            if (std::find(target.begin(), target.end(), symbols.front()) ==
-                target.end())
+            const std::size_t index = rowIt->second;
+            if (seen[index].insert(symbols.front()).second)
             {
-                target.push_back(symbols.front());
+                rows[index].push_back(symbols.front());
             }
         }
         return rows;
