@@ -2,7 +2,7 @@
   "name": "gram-editor",
   "displayName": "GramEditor - HareParse 文法",
   "description": "编辑 HareParse .gram 文法；自带编译器与内嵌语言服务器，支持诊断、补全、Token 与语法树预览、一键生成解析器。",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "publisher": "rabbitc999",
   "author": {
     "name": "小兔糖糖OvO",
