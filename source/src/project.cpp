@@ -3826,14 +3826,6 @@ bool generateCustomProject(const ProjectRequest &request,
     const std::map<std::string, std::vector<std::string>> emptyTokenDefs;
     const auto &tokenDefs =
         (request.tokenDefs == nullptr) ? emptyTokenDefs : *request.tokenDefs;
-    if (!CodeGenC99::lexDfa(tokenDefs, lexSpec.regex, lexSpec.identifier,
-                         lexSpec.commits, lexSpec.tokenLexOrder, lexDecls,
-                         lexTables, error))
-    {
-        return false;
-    }
-    const std::optional<std::string> userHeader =
-        CodeGenC99::customUserH(userCodeWithLines, unionBodyWithLines, valueType);
     const std::map<std::string, std::string> *symbolMember =
         request.symbolValueMember;
     // 目标语言在入口处分岔：C++17 / Python 都有独立的后端与模板
@@ -3863,6 +3855,16 @@ bool generateCustomProject(const ProjectRequest &request,
                                     userCodeWithLines, unionBodyWithLines,
                                     valueType, out, error);
     }
+    // 以下两步只服务 C99 产物：C++17 / Python 等后端有各自的词法器与用户头，
+    // 放在语言分派之后算，避免每次生成都白跑一遍 C99 的 DFA 与头文件拼装。
+    if (!CodeGenC99::lexDfa(tokenDefs, lexSpec.regex, lexSpec.identifier,
+                         lexSpec.commits, lexSpec.tokenLexOrder, lexDecls,
+                         lexTables, error))
+    {
+        return false;
+    }
+    const std::optional<std::string> userHeader =
+        CodeGenC99::customUserH(userCodeWithLines, unionBodyWithLines, valueType);
     // C99 的 ACTION/GOTO 文本只有 C 产物用得到；其它语言有各自的后端，
     // 放到分派之后算，避免 C++17 / Python 等路径重复扫描整张 LR 表。
     const std::string tablesText =

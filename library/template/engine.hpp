@@ -81,9 +81,12 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -161,6 +164,23 @@ public:
     }
 
     /**
+     * @brief 换下一轮的元素（循环体复用同一个子上下文时用）。
+     *
+     * 循环变量名与外层作用域在整段循环里不变，只有"当前元素 + 下标"会变；
+     * 复用同一个 `ChildModel` 就省掉了每轮重新拷贝变量名的那次分配。
+     *
+     * @param value 当前元素。
+     * @param index 当前元素下标（0 起）。
+     * @param count 这一轮循环一共几个元素。
+     */
+    void setItem(Value value, std::int64_t index, std::int64_t count)
+    {
+        item_value = std::move(value);
+        item_index = index;
+        item_count = count;
+    }
+
+    /**
      * @brief 按名字取值：先找循环变量与循环元信息，再顺着作用域链往上找。
      *
      * 循环元信息（模板里排版数组、`switch` 分支这些就靠它，省得在 C++ 里拼
@@ -221,23 +241,68 @@ public:
     static std::string render(const std::string &source, const Model &root,
                               const SnippetTable &snippets = noSnippets())
     {
-        const Env env{snippets, 0u};
+        MatchMemo memo;
+        const Env env{snippets, 0u, &memo};
         std::size_t pos = 0;
-        return renderBlock(source, pos, root, std::string(), env);
+        // 输出缓冲由调用方持有、一路往下传着追加：每层 if / for 不再各自造一个
+        // 子串再拷回父缓冲（大表格渲染时那是几十万次临时字符串分配）。
+        std::string out;
+        out.reserve(source.size() + 64u);
+        renderBlock(out, source, pos, root, std::string_view(), env);
+        return out;
     }
 
 private:
     /**
-     * @brief 渲染一趟的"外部环境"：片段表 + include 嵌套深度。
+     * @brief `{% if %}` / `{% for %}` / `{% raw %}` 配对位置的记忆表。
      *
-     * 引擎不把这两个值放进成员（那样就不是无状态的了），而是当参数一路跟着
-     * 递归往下传。每进一层 `{% include %}` 换一个 `includeDepth + 1` 的副本，
-     * 这就是循环包含的刹车。
+     * 表格模板里"每个单元格一次 `{% if loop_first %}`"这种写法，同一个标签体
+     * 会被求值几十万次；每次求值都要把模板往后扫到配对的 `{% endif %}`（模板
+     * 有几千字节时就是几十万次全模板扫描）。配对位置只跟"模板内容 + 起点"有关，
+     * 所以一次渲染里记住就行：键 =（模板首地址、起点、块种类），值 = 配对位置。
+     *
+     * 记忆表是**一次 render() 的局部量**，渲染结束即销毁，不会跨调用残留；
+     * 键里的模板首地址保证不同片段（`{% include %}`）之间不会串味。
+     */
+    struct MatchKey
+    {
+        const void *source;  ///< 模板字符串的首地址（区分不同模板 / 片段）。
+        std::size_t pos;     ///< 块标签之后的起点。
+        std::size_t kind;    ///< 块种类（0 = if，1 = for，2 = raw，3 = 顶层 else）。
+
+        bool operator==(const MatchKey &other) const
+        {
+            return source == other.source && pos == other.pos && kind == other.kind;
+        }
+    };
+
+    /** @brief `MatchKey` 的哈希（指针按位混入，位置与种类各乘一个奇数）。 */
+    struct MatchKeyHash
+    {
+        std::size_t operator()(const MatchKey &key) const
+        {
+            std::size_t h = std::hash<const void *>()(key.source);
+            h ^= key.pos + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+            h ^= key.kind + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+
+    /** @brief 配对位置记忆表：`MatchKey` → 配对标签（或顶层 else）的位置。 */
+    using MatchMemo = std::unordered_map<MatchKey, std::size_t, MatchKeyHash>;
+
+    /**
+     * @brief 渲染一趟的"外部环境"：片段表 + include 嵌套深度 + 配对记忆表。
+     *
+     * 引擎不把这几项放进成员（那样就不是无状态的了），而是当参数一路跟着
+     * 递归往下传。每进一层 `{% include %}` 换一个 `includeDepth + 1` 的副本
+     * （记忆表则共用同一张指针），这就是循环包含的刹车。
      */
     struct Env
     {
         const SnippetTable &snippets; ///< `{% include %}` 的片段表。
         std::size_t includeDepth = 0u; ///< 当前片段嵌套层数（0 = 不在片段里）。
+        MatchMemo *memo = nullptr;     ///< 配对位置记忆表（一次渲染共用一张）。
     };
 
     // -----------------------------------------------------------------------
@@ -257,60 +322,60 @@ private:
      * @param stopTag 停止标签（如 `"{% endif %}"`）；空表示一路渲染到底。
      * @param env 片段表与 include 嵌套深度（`{% include %}` 要用；其余分支只是
      *            原样往下传）。
-     * @return 这段模板的输出。
+     * @param out 输出缓冲（**追加**写）；各层共用同一个，省掉"每层造一个子串
+     *            再拷回父层"的开销。
      * @throws std::runtime_error 标签没闭合，或 include 嵌套超过 `k_maxIncludeDepth`。
      */
-    static std::string renderBlock(const std::string &source,
-                                   std::size_t &pos,
-                                   const Model &ctx,
-                                   const std::string &stopTag,
-                                   const Env &env)
+    static void renderBlock(std::string &out,
+                            const std::string &source,
+                            std::size_t &pos,
+                            const Model &ctx,
+                            std::string_view stopTag,
+                            const Env &env)
     {
-        std::string out;
-
         while (pos < source.size())
         {
             // 1. 到达停止标签（比如 {% endif %}）：吃掉它，把控制权交回上层。
             if (!stopTag.empty() && isStopTag(source, pos, stopTag))
             {
                 const std::size_t end = source.find("%}", pos);
-                if (end == std::string::npos) TMPL_THROW("未闭合标签: " + stopTag);
+                if (end == std::string::npos)
+                    TMPL_THROW("未闭合标签: " + std::string(stopTag));
                 pos = consumeBlockTagLine(source, pos, end + 2, out);
-                return out;
+                return;
             }
 
-            // 2. 找下一个 {{ / {% / {#，取最近的那个。
-            const std::size_t varPos = source.find("{{", pos);
-            const std::size_t tagPos = source.find("{%", pos);
-            const std::size_t cmtPos = source.find("{#", pos);
-            const std::size_t nextPos = std::min({varPos, tagPos, cmtPos});
+            // 2. 找下一个 {{ / {% / {#，取最近的那个（一趟扫描）。
+            const std::size_t nextPos = nextMarker(source, pos);
 
             // 3. 后面没有标签了：剩下的全是纯文本。
             if (nextPos == std::string::npos)
             {
-                out += source.substr(pos);
+                out.append(source, pos, std::string::npos);
                 pos = source.size();
                 break;
             }
 
             // 4. 先把标签之前的纯文本原样输出。
-            out += source.substr(pos, nextPos - pos);
+            out.append(source, pos, nextPos - pos);
             pos = nextPos;
 
-            // 5. 按标签种类分发。
-            if (pos == cmtPos)
+            // 5. 按标签种类分发（种类就看 `{` 后面那个字符，不必再比位置）。
+            const char marker = source[pos + 1];
+            if (marker == '#')
             {
                 // ---- 注释：{# … #} 整段丢掉，不输出 ----
                 const std::size_t end = source.find("#}", pos);
                 if (end == std::string::npos) TMPL_THROW("未闭合注释: {#");
                 pos = consumeBlockTagLine(source, pos, end + 2, out);
             }
-            else if (pos == varPos)
+            else if (marker == '{')
             {
                 // ---- 变量：{{ path.to.value }} ----
                 const std::size_t end = source.find("}}", pos);
                 if (end == std::string::npos) TMPL_THROW("未闭合变量标签: {{");
-                const std::string path = trim(source.substr(pos + 2, end - pos - 2));
+                const std::string path(trimView(
+                    std::string_view(source).substr(pos + 2, end - pos - 2)));
                 out += resolve(ctx, path).toString(); // 缺失变量 → 空串
                 pos = end + 2;
             }
@@ -321,13 +386,15 @@ private:
                 if (end == std::string::npos) TMPL_THROW("未闭合标签: {%");
                 const std::size_t tagStart = pos;
                 const std::size_t tagEnd = end + 2;
-                const std::string tag = trim(source.substr(pos + 2, end - pos - 2));
+                // 标签内容只当"视图"看：判断指令名、取路径都不必先造一个 string。
+                const std::string_view tag = trimView(
+                    std::string_view(source).substr(pos + 2, end - pos - 2));
 
                 // 内容式停止判定：{%endif%} 这种不留空格的写法也能停住。
                 if (!stopTag.empty() && matchesStopCommand(tag, stopTag))
                 {
                     pos = consumeBlockTagLine(source, tagStart, tagEnd, out);
-                    return out;
+                    return;
                 }
 
                 // 标签独占一行时整行删掉；bodyStart 就是"标签之后该从哪继续"。
@@ -336,27 +403,29 @@ private:
                 if (commandIs(tag, "if"))
                 {
                     // ---- 条件：{% if cond %} … {% else %} … {% endif %} ----
-                    const std::string condPath = trim(tag.substr(2));
+                    const std::string condPath(trimView(tag.substr(2)));
                     const bool cond = resolve(ctx, condPath).truthy();
 
                     // 配对的 endif：按嵌套深度找，内层的 if/endif 只是把深度加减一下。
-                    const std::size_t endifPos = findMatching(source, bodyStart, "{% if ", "{% endif %}");
+                    const std::size_t endifPos =
+                        matchOrScan(source, bodyStart, "{% if ", "{% endif %}", 0u, env);
                     // 与它配对的**第一个顶层** else（没有就是 npos）。
-                    const std::size_t elsePos = findTopLevelElse(source, bodyStart, endifPos);
+                    const std::size_t elsePos =
+                        elseOrScan(source, bodyStart, endifPos, env);
 
                     if (cond)
                     {
                         // then 分支：渲染到 {% else %} 或 {% endif %} 为止。
                         std::size_t branchPos = bodyStart;
-                        out += renderBlock(source, branchPos, ctx,
-                                           elsePos == std::string::npos ? "{% endif %}" : "{% else %}",
-                                           env);
+                        renderBlock(out, source, branchPos, ctx,
+                                    elsePos == std::string::npos ? "{% endif %}" : "{% else %}",
+                                    env);
                     }
                     if (!cond && elsePos != std::string::npos)
                     {
                         // else 分支：从 {% else %} 之后渲染到 {% endif %} 为止。
                         std::size_t branchPos = afterTag(source, elsePos);
-                        out += renderBlock(source, branchPos, ctx, "{% endif %}", env);
+                        renderBlock(out, source, branchPos, ctx, "{% endif %}", env);
                     }
 
                     // 不管走了哪条分支，都从配对的 {% endif %} 之后接着渲染。
@@ -365,19 +434,20 @@ private:
                 else if (commandIs(tag, "for"))
                 {
                     // ---- 循环：{% for item in list.path %} … {% endfor %} ----
-                    const std::size_t endforPos = findMatching(source, bodyStart, "{% for ", "{% endfor %}");
-                    const std::string spec = trim(tag.substr(3)); // "item in list.path"
+                    const std::size_t endforPos =
+                        matchOrScan(source, bodyStart, "{% for ", "{% endfor %}", 1u, env);
+                    const std::string_view spec = trimView(tag.substr(3)); // "item in list.path"
                     const std::size_t inPos = spec.find(" in ");
 
-                    if (inPos == std::string::npos)
+                    if (inPos == std::string_view::npos)
                     {
                         // 写坏的 for：整块跳过（不能只跳标签，否则会连着把后面吃掉）。
                         pos = afterTag(source, endforPos);
                     }
                     else
                     {
-                        const std::string itemName = trim(spec.substr(0, inPos));
-                        const std::string listPath = trim(spec.substr(inPos + 4));
+                        const std::string itemName(trimView(spec.substr(0, inPos)));
+                        const std::string listPath(trimView(spec.substr(inPos + 4)));
                         const Value list = resolve(ctx, listPath);
 
                         // 列表不存在或为空：整块跳过（但位置要挪到 endfor 之后）。
@@ -386,15 +456,17 @@ private:
                             const std::vector<Value> &elements = list.asArray()->items;
                             const std::int64_t elementCount =
                                 static_cast<std::int64_t>(elements.size());
+                            // 循环变量名在整段循环里不变：子上下文只建一次，每轮
+                            // 只换"当前元素 + 下标"，省掉每轮拷一次变量名。
+                            ChildModel child(ctx, itemName, Value{});
                             for (std::size_t index = 0u; index < elements.size(); ++index)
                             {
-                                // 每轮一个子上下文：item 指向当前元素，loop_* 给下标 /
-                                // 首尾标志，其余走作用域链。
-                                const ChildModel child(ctx, itemName, elements[index],
-                                                       static_cast<std::int64_t>(index),
-                                                       elementCount);
+                                // 每轮只换"当前元素 + 下标"，其余走作用域链。
+                                child.setItem(elements[index],
+                                              static_cast<std::int64_t>(index),
+                                              elementCount);
                                 std::size_t bodyPos = bodyStart;
-                                out += renderBlock(source, bodyPos, child, "{% endfor %}", env);
+                                renderBlock(out, source, bodyPos, child, "{% endfor %}", env);
                             }
                         }
                         pos = afterTag(source, endforPos);
@@ -407,8 +479,8 @@ private:
                     // 生成 C / C# 这类语言的模板常要写字面量花括号（比如
                     // 说明 `{{ target_code }}` 这种文法写法），就靠它来"转义"。
                     const std::size_t rawEnd =
-                        findMatching(source, bodyStart, "{% raw %}", "{% endraw %}");
-                    out += source.substr(bodyStart, rawEnd - bodyStart);
+                        matchOrScan(source, bodyStart, "{% raw %}", "{% endraw %}", 2u, env);
+                    out.append(source, bodyStart, rawEnd - bodyStart);
                     pos = afterTag(source, rawEnd);
                 }
                 else if (commandIs(tag, "include"))
@@ -429,10 +501,10 @@ private:
                         // 独占一行时，这一行前面的缩进已经被 consumeBlockTagLine
                         // 从 out 末尾收回去了——所以片段正文接在"收干净之后"的
                         // out 后面，不会多出缩进，也不会多出空行。
-                        const Env nested{env.snippets, env.includeDepth + 1u};
+                        const Env nested{env.snippets, env.includeDepth + 1u, env.memo};
                         std::size_t snippetPos = 0u;
-                        out += renderBlock(found->second, snippetPos, ctx,
-                                           std::string(), nested);
+                        renderBlock(out, found->second, snippetPos, ctx,
+                                    std::string_view(), nested);
                     }
                     // 表里没这个名字 / 没给表 / 标签里没写名字：输出空串，安全跳过。
                     pos = bodyStart;
@@ -445,13 +517,73 @@ private:
                 }
             }
         }
-
-        return out;
     }
 
     // -----------------------------------------------------------------------
     //  嵌套匹配
     // -----------------------------------------------------------------------
+
+    /**
+     * @brief 块配对位置的取值口：先查记忆表，查不到才真扫一遍并存进去。
+     *
+     * 表格模板的循环体里同一个 `{% if %}` 会被求值几十万次，而这个位置只跟
+     * "模板 + 起点"有关，所以第一次扫完就记住。`kind` 只用做记忆表的键
+     * （0 = if，1 = for，2 = raw，3 = 顶层 else），不影响扫描逻辑。
+     *
+     * @param source 模板字符串。
+     * @param pos 块标签之后的起点。
+     * @param openTag 开始标签（如 `"{% if "`）。
+     * @param closeTag 结束标签（如 `"{% endif %}"`）。
+     * @param kind 块种类（记忆表键的一部分）。
+     * @param env 渲染环境（记忆表挂在它上面；为空就每次真扫）。
+     * @return 配对结束标签的位置。
+     * @throws std::runtime_error 找不到配对的结束标签。
+     */
+    static std::size_t matchOrScan(const std::string &source,
+                                   std::size_t pos,
+                                   std::string_view openTag,
+                                   std::string_view closeTag,
+                                   std::size_t kind,
+                                   const Env &env)
+    {
+        if (env.memo == nullptr) return findMatching(source, pos, openTag, closeTag);
+
+        const MatchKey key{source.data(), pos, kind};
+        const auto found = env.memo->find(key);
+        if (found != env.memo->end()) return found->second;
+
+        const std::size_t result = findMatching(source, pos, openTag, closeTag);
+        env.memo->emplace(key, result);
+        return result;
+    }
+
+    /**
+     * @brief `{% if %}` 顶层 `{% else %}` 位置的取值口：同样先查记忆表。
+     *
+     * 键里的起点 `from` 唯一决定扫描终点 `to`（= 配对 endif），所以不必把 `to`
+     * 也放进键。
+     *
+     * @param source 模板字符串。
+     * @param from 查找起点（`if` 标签之后）。
+     * @param to 查找终点（配对 `{% endif %}` 的位置）。
+     * @param env 渲染环境（记忆表挂在它上面；为空就每次真扫）。
+     * @return `{% else %}` 的位置；没有返回 `npos`。
+     */
+    static std::size_t elseOrScan(const std::string &source,
+                                  std::size_t from,
+                                  std::size_t to,
+                                  const Env &env)
+    {
+        if (env.memo == nullptr) return findTopLevelElse(source, from, to);
+
+        const MatchKey key{source.data(), from, 3u};
+        const auto found = env.memo->find(key);
+        if (found != env.memo->end()) return found->second;
+
+        const std::size_t result = findTopLevelElse(source, from, to);
+        env.memo->emplace(key, result);
+        return result;
+    }
 
     /**
      * @brief 找与 `openTag` 配对的 `closeTag`，按**嵌套深度**取最外层那个。
@@ -469,22 +601,25 @@ private:
      */
     static std::size_t findMatching(const std::string &source,
                                     std::size_t pos,
-                                    const std::string &openTag,
-                                    const std::string &closeTag)
+                                    std::string_view openTag,
+                                    std::string_view closeTag)
     {
-        const std::string open = tagCommand(openTag);
-        const std::string close = tagCommand(closeTag);
+        const std::string_view open = tagCommand(openTag);
+        const std::string_view close = tagCommand(closeTag);
         int depth = 1;
         std::size_t cur = pos;
 
         while (true)
         {
             const std::size_t tagPos = nextTag(source, cur, source.size());
-            if (tagPos == std::string::npos) TMPL_THROW("未闭合标签: " + closeTag);
+            if (tagPos == std::string::npos)
+                TMPL_THROW("未闭合标签: " + std::string(closeTag));
             const std::size_t end = source.find("%}", tagPos);
-            if (end == std::string::npos) TMPL_THROW("未闭合标签: " + closeTag);
+            if (end == std::string::npos)
+                TMPL_THROW("未闭合标签: " + std::string(closeTag));
 
-            const std::string command = trim(source.substr(tagPos + 2, end - tagPos - 2));
+            const std::string_view command = trimView(
+                std::string_view(source).substr(tagPos + 2, end - tagPos - 2));
             if (!open.empty() && commandIs(command, open))
             {
                 ++depth; // 又开了一层
@@ -522,10 +657,11 @@ private:
             const std::size_t end = source.find("%}", tagPos);
             if (end == std::string::npos) return std::string::npos;
 
-            const std::string command = trim(source.substr(tagPos + 2, end - tagPos - 2));
-            if (commandIs(command, "if")) ++depth;                       // 内层 if
-            else if (command == "endif") { if (depth > 0) --depth; }     // 内层 endif
-            else if (command == "else" && depth == 0) return tagPos;     // 外层等着的那个
+            const std::string_view command = trimView(
+                std::string_view(source).substr(tagPos + 2, end - tagPos - 2));
+            if (commandIs(command, "if")) ++depth;                   // 内层 if
+            else if (command == "endif") { if (depth > 0) --depth; }  // 内层 endif
+            else if (command == "else" && depth == 0) return tagPos;  // 外层等着的那个
 
             pos = end + 2;
         }
@@ -542,6 +678,19 @@ private:
      */
     static std::string trim(const std::string &text)
     {
+        return std::string(trimView(text));
+    }
+
+    /**
+     * @brief 去掉两端的空白（返回视图，不拷贝）。
+     *
+     * 热路径（每个标签、每个变量都要 trim 一次）用它：只挪指针，不分配。
+     *
+     * @param text 文本视图（**必须**在返回值使用期间保持有效）。
+     * @return 去掉两端空白后的视图。
+     */
+    static std::string_view trimView(std::string_view text)
+    {
         std::size_t begin = 0;
         std::size_t end = text.size();
         while (begin < end && isSpace(text[begin])) ++begin;
@@ -550,33 +699,19 @@ private:
     }
 
     /**
-     * @brief 去掉字符串左端的空白。
-     * @param out 文本（按值传参，调用方不用另拷一份）。
-     * @return 去掉左端空白后的文本。
-     */
-    static std::string trimLeft(std::string out)
-    {
-        std::size_t begin = 0;
-        while (begin < out.size() && isSpace(out[begin])) ++begin;
-        out.erase(0, begin);
-        return out;
-    }
-
-    /**
-     * @brief 去掉前缀 `[0, pos)` 右端的**行内空白**（空格 / 制表符）。
+     * @brief 去掉 `text` 右端的**行内空白**（空格 / 制表符），就地截断。
      *
      * 块标签独占一行时要"整行删掉"：标签左边那点缩进在发现标签之前就已经
      * 写进 `out` 了，用它把缩进收回来（换行要留着，否则两行会粘在一起）。
+     * 就地 `resize` 而不是返回新字符串——热路径上每个块标签都要走一次。
      *
-     * @param text 文本（传 `out`）。
-     * @param pos 只在这个位置之前裁（通常是 `text.size()`）。
-     * @return 裁掉右端行内空白后的文本。
+     * @param text 文本（就地截断）。
      */
-    static std::string trimRight(const std::string &text, std::size_t pos)
+    static void trimRightInPlace(std::string &text)
     {
-        std::size_t end = std::min(pos, text.size());
+        std::size_t end = text.size();
         while (end > 0 && (text[end - 1] == ' ' || text[end - 1] == '\t')) --end;
-        return text.substr(0, end);
+        text.resize(end);
     }
 
     /**
@@ -594,15 +729,26 @@ private:
      */
     static bool isStandaloneLine(const std::string &source, std::size_t tagStart, std::size_t tagEnd)
     {
-        // 前面：从标签往左退到行首，中间只能有空格 / 制表符。
-        std::size_t lineBegin = tagStart;
-        while (lineBegin > 0 && source[lineBegin - 1] != '\n') --lineBegin;
-        if (!trimLeft(source.substr(lineBegin, tagStart - lineBegin)).empty()) return false;
+        // 前面：往左退到行首，中间只能有空格 / 制表符。**碰到第一个非空白就
+        // 立刻判负**——一行很长的表格行里，标签左边通常紧挨着上一个单元格的
+        // 内容，退一步就能收工，不必先算出行首再整段扫一遍。
+        std::size_t index = tagStart;
+        while (index > 0 && source[index - 1] != '\n')
+        {
+            if (!isSpace(source[index - 1])) return false;
+            --index;
+        }
 
-        // 后面：从标签往右退到行尾，中间只能有空格 / 制表符（\r 交给 trim）。
-        std::size_t lineEnd = tagEnd;
-        while (lineEnd < source.size() && source[lineEnd] != '\n') ++lineEnd;
-        return trim(source.substr(tagEnd, lineEnd - tagEnd)).empty();
+        // 后面：往右退到行尾，中间只能有空格 / 制表符（\r 归 isSpace 管）。
+        // 同理，碰到第一个非空白立刻判负。
+        index = tagEnd;
+        while (index < source.size())
+        {
+            if (source[index] == '\n') return true;
+            if (!isSpace(source[index])) return false;
+            ++index;
+        }
+        return true;
     }
 
     /**
@@ -634,7 +780,7 @@ private:
     /**
      * @brief 已经处理完一个块标签：独占一行时把这一行整行删掉。
      *
-     * 两件事：把 `out` 末尾已经写出去的本行缩进收回来（`trimRight`），再把
+     * 两件事：把 `out` 末尾已经写出去的本行缩进收回来（`trimRightInPlace`），再把
      * 标签之后到行尾的空白连同换行吃掉（`skipLineEnd`）。
      *
      * @param source 模板字符串。
@@ -649,7 +795,7 @@ private:
                                            std::string &out)
     {
         if (!isStandaloneLine(source, tagStart, tagEnd)) return tagEnd;
-        out = trimRight(out, out.size()); // 收回本行的缩进（换行保留）
+        trimRightInPlace(out); // 收回本行的缩进（换行保留）
         return skipLineEnd(source, tagEnd);
     }
 
@@ -671,6 +817,31 @@ private:
     // -----------------------------------------------------------------------
 
     /**
+     * @brief 从 `pos` 开始找下一个**标签起点**（`{{` / `{%` / `{#`）。
+     *
+     * 只扫一次 `{`：模板里除了这三种开头，几乎不会出现别的花括号（`{% raw %}`
+     * 段里才有），所以"找 `{` 再看后一个字符"比分别找三个两字符记号快得多
+     * ——后者每次都要把"找不到"的那种一路扫到模板末尾，热循环里就是几十万次
+     * 全模板扫描。
+     *
+     * @param source 模板字符串。
+     * @param pos 起始位置。
+     * @return 标签起点；后面没有标签返回 `npos`。
+     */
+    static std::size_t nextMarker(const std::string &source, std::size_t pos)
+    {
+        std::size_t at = source.find('{', pos);
+        while (at != std::string::npos)
+        {
+            if (at + 1 >= source.size()) return std::string::npos;
+            const char kind = source[at + 1];
+            if (kind == '{' || kind == '%' || kind == '#') return at;
+            at = source.find('{', at + 1); // 普通花括号（比如 C 代码里的大括号）：接着找
+        }
+        return std::string::npos;
+    }
+
+    /**
      * @brief 从 `pos` 开始找下一个 `{% … %}` 标签，沿途跳过 `{# … #}` 注释。
      * @param source 模板字符串。
      * @param pos 起始位置。
@@ -681,21 +852,29 @@ private:
     {
         while (pos < limit)
         {
-            const std::size_t tagPos = source.find("{%", pos);
-            const std::size_t cmtPos = source.find("{#", pos);
-            if (tagPos == std::string::npos && cmtPos == std::string::npos) return std::string::npos;
+            const std::size_t markerPos = nextMarker(source, pos);
+            if (markerPos == std::string::npos) return std::string::npos;
 
             // 注释里的 {% endif %} 之类的文字不算标签。
-            if (cmtPos != std::string::npos && (tagPos == std::string::npos || cmtPos < tagPos))
+            if (source[markerPos + 1] == '#')
             {
-                const std::size_t end = source.find("#}", cmtPos);
+                const std::size_t end = source.find("#}", markerPos);
                 if (end == std::string::npos) return std::string::npos; // 注释没闭合：后面都不算标签
                 pos = end + 2;
                 continue;
             }
 
-            if (tagPos == std::string::npos || tagPos >= limit) return std::string::npos;
-            return tagPos;
+            // `{{`（变量）不是块标签：只跳过这一个 `{` 接着找。**不能跳过两个字符**
+            // ——`{% raw %}{{% endraw %}` 这种"原样段里就一个左花括号"的写法，
+            // 跳过两个会把紧跟着的 `{%` 吃掉。
+            if (source[markerPos + 1] == '{')
+            {
+                pos = markerPos + 1;
+                continue;
+            }
+
+            if (markerPos >= limit) return std::string::npos;
+            return markerPos;
         }
         return std::string::npos;
     }
@@ -703,14 +882,14 @@ private:
     /**
      * @brief 把字面标签拆成指令名：`"{% endif %}"` → `"endif"`。
      * @param tag 字面标签或指令名。
-     * @return 指令名。
+     * @return 指令名（视图，指向 `tag` 自己的内存，不分配）。
      */
-    static std::string tagCommand(const std::string &tag)
+    static std::string_view tagCommand(std::string_view tag)
     {
-        std::string out = trim(tag);
-        if (out.compare(0, 2, "{%") == 0) out.erase(0, 2);
-        if (out.size() >= 2 && out.compare(out.size() - 2, 2, "%}") == 0) out.erase(out.size() - 2);
-        return trim(out);
+        std::string_view out = trimView(tag);
+        if (out.size() >= 2 && out.compare(0, 2, "{%") == 0) out.remove_prefix(2);
+        if (out.size() >= 2 && out.compare(out.size() - 2, 2, "%}") == 0) out.remove_suffix(2);
+        return trimView(out);
     }
 
     /**
@@ -723,10 +902,11 @@ private:
      * @param command 指令名，如 `"if"`。
      * @return 是这条指令返回 true。
      */
-    static bool commandIs(const std::string &tag, const std::string &command)
+    static bool commandIs(std::string_view tag, std::string_view command)
     {
         if (tag == command) return true;
-        return tag.size() > command.size() && tag.compare(0, command.size(), command) == 0 &&
+        return tag.size() > command.size() &&
+               tag.compare(0, command.size(), command) == 0 &&
                isSpace(tag[command.size()]);
     }
 
@@ -751,22 +931,22 @@ private:
      * @param tag 标签内容（已 trim，如 `include "header"`）。
      * @return 片段名；取不到返回空串。
      */
-    static std::string includeName(const std::string &tag)
+    static std::string includeName(std::string_view tag)
     {
         const std::size_t blank = tag.find_first_of(" \t\r\n");
-        if (blank == std::string::npos) return std::string(); // 光有指令名，没写名字
-        const std::string rest = trim(tag.substr(blank));
+        if (blank == std::string_view::npos) return std::string(); // 光有指令名，没写名字
+        const std::string_view rest = trimView(tag.substr(blank));
         if (rest.empty()) return std::string();
 
         const char quote = rest[0];
         if ((quote == '"') || (quote == '\''))
         {
             const std::size_t close = rest.find(quote, 1u);
-            if (close == std::string::npos) return std::string(); // 引号没闭合
-            return rest.substr(1u, close - 1u);
+            if (close == std::string_view::npos) return std::string(); // 引号没闭合
+            return std::string(rest.substr(1u, close - 1u));
         }
         const std::size_t stop = rest.find_first_of(" \t\r\n");
-        return (stop == std::string::npos) ? rest : rest.substr(0u, stop);
+        return std::string((stop == std::string_view::npos) ? rest : rest.substr(0u, stop));
     }
 
     /**
@@ -781,13 +961,15 @@ private:
      * @param stopTag 停止标签。
      * @return 是停止标签返回 true。
      */
-    static bool isStopTag(const std::string &source, std::size_t pos, const std::string &stopTag)
+    static bool isStopTag(const std::string &source, std::size_t pos, std::string_view stopTag)
     {
-        if (source.compare(pos, stopTag.size(), stopTag) == 0) return true;
+        if (source.compare(pos, stopTag.size(), stopTag.data(), stopTag.size()) == 0) return true;
         if (source.compare(pos, 2, "{%") != 0) return false;
         const std::size_t end = source.find("%}", pos + 2);
         if (end == std::string::npos) return false;
-        return trim(source.substr(pos + 2, end - pos - 2)) == tagCommand(stopTag);
+        const std::string_view command = trimView(
+            std::string_view(source).substr(pos + 2, end - pos - 2));
+        return command == tagCommand(stopTag);
     }
 
     /**
@@ -796,7 +978,7 @@ private:
      * @param stopTag 停止标签。
      * @return 是停止指令返回 true。
      */
-    static bool matchesStopCommand(const std::string &tag, const std::string &stopTag)
+    static bool matchesStopCommand(std::string_view tag, std::string_view stopTag)
     {
         return tag == tagCommand(stopTag);
     }
