@@ -186,7 +186,7 @@ void printUsage(const std::string &program)
         << "  zip [out FILE.zip]    调用 Python 3.11+ 发布脚本打包当前可执行文件\n"
         << "\n"
         << "文法指令（%token / %define / %mode / %if …，含 %token NAME include \"csv\"\n"
-        << "这种从 CSV 追加字面量别名的写法）见 doc/12-grammar-usage.md 与 doc/05-grammar.md。\n";
+        << "这种从 CSV 追加字面量别名的写法）见 doc/07-grammar-usage.md 与 doc/05-grammar.md。\n";
 }
 
 /**

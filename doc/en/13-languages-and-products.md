@@ -1,10 +1,10 @@
-# 11 Target Languages, Output Artifacts, and API (User Manual)
+# 13 Target Languages, Output Artifacts, and API (User Manual)
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
 This chapter was split out of [`README.md`](../README.md): the selection and artifact forms of the nine target languages (C99 / C++17 / Python / C# / Rust / Go / Java / JS-TS / Lepus) and of the export profile `--lang gram` that produces "only the grammar and an analysis report"; the several language-related switches `%namespace` / `%cpp_only` / `%class`; the list of generated artifacts; and the API and memory management of the generated code.
 
-Language backend implementations and templates are in [`07-codegen.md`](../07-codegen.md); the API details of each artifact profile are in [`08-generated-code.md`](../08-generated-code.md); artifacts of the lexical mode are in [`13-modes.md`](../13-modes.md). The unified matrix of the modes available per language and of the incremental API is in [12 Modes Supported by Each Language](15-language-mode-support.md).
+Language backend implementations and templates are in [`07-codegen.md`](../07-codegen.md); the API details of each artifact profile are in [`08-generated-code.md`](../08-generated-code.md); artifacts of the lexical mode are in [`12-modes.md`](../12-modes.md). The unified matrix of the modes available per language and of the incremental API is in [14 Modes Supported by Each Language](14-language-mode-support.md).
 
 ## Target Languages (C99 / C++17 / Python / C# / Rust / Go / Java / JS-TS / Lepus)
 
@@ -45,7 +45,7 @@ The fifth is `--lang rust`: the artifacts are a Cargo project (`Cargo.toml` + `s
 
 The sixth is `--lang go`: the artifacts are a Go module (`go.mod` + `parser.go` / `token.go` / `main.go`); **only the standard library is used** (lexer regexes use the standard library's `regexp`), and `go build` / `go run .` just work — see the detailed comparison in [Go Output](#go-output---lang-go) below.
 
-The seventh and eighth are the narrow DD/Earley/CYK backends. `--lang java` generates a self-contained `Parser.java`, compiled with `javac -encoding UTF-8 Parser.java`; `--lang js` generates `parser.ts` and `package.json`, with erasable TypeScript type annotations in the code, directly executable by Node.js 22+. Both profiles support `%tree`: DD backtracks by production declaration order; Earley performs predict, scan and complete and keeps the first derivation tree; CYK decides using a CNF span table and then recovers the first derivation tree against the original grammar. Semantic actions, `%value_type` / `%union`, `%sync`, `%commit`, `%copy` and user code sections are currently unsupported; other modes are explicitly rejected at generation time, and the full boundary is in the [support matrix](../15-language-mode-support.md).
+The seventh and eighth are the narrow DD/Earley/CYK backends. `--lang java` generates a self-contained `Parser.java`, compiled with `javac -encoding UTF-8 Parser.java`; `--lang js` generates `parser.ts` and `package.json`, with erasable TypeScript type annotations in the code, directly executable by Node.js 22+. Both profiles support `%tree`: DD backtracks by production declaration order; Earley performs predict, scan and complete and keeps the first derivation tree; CYK decides using a CNF span table and then recovers the first derivation tree against the original grammar. Semantic actions, `%value_type` / `%union`, `%sync`, `%commit`, `%copy` and user code sections are currently unsupported; other modes are explicitly rejected at generation time, and the full boundary is in the [support matrix](../14-language-mode-support.md).
 
 The C / C++17 / Python profiles are **semantically** consistent: the same grammar and the same input produce byte-identical output (including error message text) (under Windows, C# writes platform CRLF line endings, normalized before comparison): among the grammar-like grammars in `example/`, 36 compile and run with identical results under both the C99 and C++17 targets (`namespace_demo.gram` produces C++17 only, `prefix_demo.gram` produces C99 only); those that avoid C-specific semantic-value syntax (such as `example/python_demo.gram`) also behave the same under Python; and for the lexer-mode examples (`example/lexer_only.gram`) all six profiles can produce a lexer (C#'s Token type names and line/column numbers match C; Rust / Go line/column numbers match C, with lexer regexes going through the official `regex` and the standard-library `regexp` respectively).
 
@@ -111,7 +111,7 @@ When a grammar contains `%cpp_only`, writing `--lang c` on the command line (or 
 
 The location-info API is also present in all six profiles (C99 `Parser_CurrentLocation()`, C++17 `Engine::currentLocation()`, Python `engine.current_location()`, C# `CurrentLocation`, Rust `engine.current_location()`, Go `engine.CurrentLocation()`), and `offset` is always counted in UTF-8 bytes.
 
-The same pattern cannot be both a `%token` and a `%commit` / `%trivia` (`%trivia` is equivalent to `%commit skip`, and the two spellings generate byte-identical lexer tables); matching shares a single longest-match order with `%token` / built-in comment rules (equal lengths resolved by declaration order). Usage and complete examples are in [`05-grammar.md`](../05-grammar.md) and [`12-grammar-usage.md`](../12-grammar-usage.md); the API details of what is generated are in [`08-generated-code.md`](../08-generated-code.md).
+The same pattern cannot be both a `%token` and a `%commit` / `%trivia` (`%trivia` is equivalent to `%commit skip`, and the two spellings generate byte-identical lexer tables); matching shares a single longest-match order with `%token` / built-in comment rules (equal lengths resolved by declaration order). Usage and complete examples are in [`05-grammar.md`](../05-grammar.md) and [`11-grammar-usage.md`](../11-grammar-usage.md); the API details of what is generated are in [`08-generated-code.md`](../08-generated-code.md).
 
 Token and commit types also support an optional display alias:
 
@@ -310,7 +310,7 @@ The backend currently rejects `%union`, member annotations, `%destructor`, `erro
 LL modes require a grammar that directly satisfies the selected lookahead; actions from automatic
 left-recursion rewriting are not supported.
 
-See the [Lepus backend reference](../17-lepus-backend.md) for full limitations and
+See the [Lepus backend reference](../23-lepus-backend.md) for full limitations and
 regression commands, and the runnable examples
 [`lepus_ll1.gram`](../../example/lepus_ll1.gram) and [`lepus_lr1.gram`](../../example/lepus_lr1.gram).
 
@@ -327,8 +327,8 @@ head -n 30 out/pl0.analysis.md  # 冲突消解 / 未消解冲突 / 分析报告
 | | Grammar export profile (`--lang gram`) |
 | --- | --- |
 | Files | `<original file name>.gram` (`grammar.gram` when no file is given) / `<grammar name>.analysis.md` / `RESULT.md` / files from `%copy` |
-| Modes | All 16 modes can be exported; `glr` / `earley` / `cyk` export only the grammar and the corresponding analysis report, without generating a runtime. `--mode lex` reports as a lexical section + Token table; see the [support matrix](../15-language-mode-support.md) |
-| Plotting | `gram` does not generate a Python runtime or `--svg` / `--dot` demo programs; for plotting of Python artifacts see [`10`](../13-modes.md) |
+| Modes | All 16 modes can be exported; `glr` / `earley` / `cyk` export only the grammar and the corresponding analysis report, without generating a runtime. `--mode lex` reports as a lexical section + Token table; see the [support matrix](../14-language-mode-support.md) |
+| Plotting | `gram` does not generate a Python runtime or `--svg` / `--dot` demo programs; for plotting of Python artifacts see [`10`](../12-modes.md) |
 | Report | the analysis report is its own file, paired with the `.gram` (`pl0.gram` ↔ `pl0.analysis.md`), and its body is the same as what `--report FILE` writes |
 | Inapplicable directives | `%namespace` / `%class` / `%package` / `%import` / `%class_body` / `%destructor` / `%cpp_only` are all reported with one line and ignored |
 
@@ -362,7 +362,7 @@ The generator emits only split-file projects, written by default to `--out-dir` 
 | `Makefile` | build script: `make` produces `libparser.a` + `parser_demo`; also has `lib` / `demo` / `run` / `clean` |
 | `CMakeLists.txt` | CMake build script (equivalent to `Makefile`): `cmake -S . -B build && cmake --build build` |
 | `RESULT.md` | generation info, artifact list, build-and-run instructions, conflict resolution and unresolved conflicts (add `--full-report` for the full analysis report, see [`08-generated-code.md`](08-generated-code.md#17-resultmd-brief-by-default)) |
-| `mermaid/*` | state-machine diagrams: `index.html` / `grammar.html` / `lexer.html` and `.mmd` sources; **generated only when `%mermaid` / `--mermaid` is on** (independent of teaching mode), see [State-Machine Diagrams](../13-modes.md#状态机图示mermaid) |
+| `mermaid/*` | state-machine diagrams: `index.html` / `grammar.html` / `lexer.html` and `.mmd` sources; **generated only when `%mermaid` / `--mermaid` is on** (independent of teaching mode), see [State-Machine Diagrams](../12-modes.md#状态机图示mermaid) |
 
 ### Templates (`source/templates/`)
 

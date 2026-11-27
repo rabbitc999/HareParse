@@ -1,4 +1,4 @@
-# Lepus 目标语言
+# 23 Lepus 目标语言
 
 `--lang lepus` 或文法中的 `%lang lepus` 生成原生 Lepus 源码 `parser.lep` 与
 `RESULT.md`。支持全部 16 种生成模式，默认使用 IELR。

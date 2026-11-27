@@ -138,7 +138,7 @@ project/bigint-calc/
 - 编译产物的 `statusName()` 会带 4 条 `-Wswitch` 警告（生成的公开层没给
   `ErrExpected` / `ErrUnexpectedEof` / `ErrLexUnterminated` / `ErrLexChar`
   单独列分支）——这是生成器的既有行为，其它工程与
-  [`../../doc/09-build-and-test.md`](../../doc/09-build-and-test.md) 里也是这么记的。
+  [`../../doc/04-build-and-test.md`](../../doc/04-build-and-test.md) 里也是这么记的。
 
 ## 相关文档
 

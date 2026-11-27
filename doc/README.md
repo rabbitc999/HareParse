@@ -1,6 +1,6 @@
 # 仓库文档
 
-Lepus 目标语言的生成方式、API 与支持边界见 [Lepus 后端](17-lepus-backend.md)。
+Lepus 目标语言的生成方式、API 与支持边界见 [23 Lepus 后端](23-lepus-backend.md)。
 
 各目标语言的 `%postlex` 写法见[词法后处理与占位 Token](05-grammar.md#词法后处理与占位-token)，注释的读取方式见[保留注释及源位置](05-grammar.md#保留注释及源位置)。
 
@@ -12,46 +12,45 @@ Lepus 目标语言的生成方式、API 与支持边界见 [Lepus 后端](17-lep
 > 独立仓库 <https://github.com/rabbitc999/Lepus>；本文里指向 `lepus/` 的链接都改指新仓库的
 > 同名文档。
 
-HareParse 的[中英双语显示、内嵌手册与语言服务器、发布说明](16-i18n-and-packaging.md)覆盖 `--ui-lang`、`man` 与 `lsp` 子命令、控制台与管道、两个工具的独立打包脚本。
+HareParse 的[中英双语显示、内嵌手册与语言服务器、发布说明](15-i18n-and-packaging.md)覆盖 `--ui-lang`、`man` 与 `lsp` 子命令、控制台与管道、两个工具的独立打包脚本。
 
 Lepus 1.0.0 的名称、`.lep` 工程布局与中文／英文／日语语言选择见[Lepus 名称与三语说明](https://github.com/rabbitc999/Lepus/blob/master/doc/37-name-freeze.md)。
-Lepus 的[文档索引](https://github.com/rabbitc999/Lepus/blob/master/doc/README.md)结合正式 example 源码、expected 输出与错误边界逐步讲解。初学者从 [08 基础程序](https://github.com/rabbitc999/Lepus/blob/master/doc/01-quickstart.md) 开始，专项环境和验收范围见 [28 样例验证](https://github.com/rabbitc999/Lepus/blob/master/doc/11-algorithm-validation.md)。
+Lepus 的[文档索引](https://github.com/rabbitc999/Lepus/blob/master/doc/README.md)结合正式 example 源码、expected 输出与错误边界逐步讲解。初学者从 [06 基础程序](https://github.com/rabbitc999/Lepus/blob/master/doc/01-quickstart.md) 开始，专项环境和验收范围见 [28 样例验证](https://github.com/rabbitc999/Lepus/blob/master/doc/11-algorithm-validation.md)。
 
 
-引用来源与词法生命周期检查见 [04 引用与迭代](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)，专项回归为 `tests/lepus_reference_escape.py`。
+引用来源与词法生命周期检查见 [07 引用与迭代](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)，专项回归为 `tests/lepus_reference_escape.py`。
 
-`T &` 默认只读引用见 [引用语法糖](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)；未分配区域的 panic、自定义堆范围检查及 AOT 默认 unchecked / 显式 checked 见 [23 内存分配器](https://github.com/rabbitc999/Lepus/blob/master/doc/20-memory-allocator.md)，专项为 `tests/lepus_reference_sugar.py` 和 `tests/lepus_memory_guard.py`。
+`T &` 默认只读引用见 [引用语法糖](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)；未分配区域的 panic、自定义堆范围检查及 AOT 默认 unchecked / 显式 checked 见 [18 内存分配器](https://github.com/rabbitc999/Lepus/blob/master/doc/20-memory-allocator.md)，专项为 `tests/lepus_reference_sugar.py` 和 `tests/lepus_memory_guard.py`。
 
 引用与泛型、枚举、回调、迭代器、接口及 Drop 的跨功能组合见 [reference_combinations.lep](https://github.com/rabbitc999/Lepus/blob/master/example/samples/reference_combinations.lep)，专项回归为 `tests/lepus_reference_combinations.py`，覆盖正常解释 / AOT 与非法逃逸诊断。
 
-从 [01 仓库文档总览](01-overview.md) 进入。此目录是**仓库全部文档的唯一入口**：整个仓库的导航、跨项目说明，以及 HareParse 解析器生成器的手册与实现文档都放在这里。
+从 [02 仓库文档总览](02-overview.md) 进入。此目录是**仓库全部文档的唯一入口**：整个仓库的导航、跨项目说明，以及 HareParse 解析器生成器的手册与实现文档都放在这里。
 
 | 文档 | 内容 |
 | --- | --- |
-| [01 仓库文档总览](01-overview.md) | 各工程、附加库及全部文档的入口 |
-| [02 满级文法](02-gram-legend.md) | 跨解析器、Lepus 和课程实验的虚构外传，续写 Lepus 1.0、迭代链与多数据库验收 |
+| [02 仓库文档总览](02-overview.md) | 各工程、附加库及全部文档的入口 |
+| [01 满级文法](01-gram-legend.md) | 跨解析器、Lepus 和课程实验的虚构外传，续写 Lepus 1.0、迭代链与多数据库验收 |
 | [03 架构](03-architecture.md) | 生成器的模块、数据流与代码约定 |
-| [04 一份 .gram，八种语言](04-hareparse-story.md) | HareParse 生成器的演进故事 |
-| [05 文法](05-grammar.md) | `.gram` 语法规范与生成期校验 |
+| [04 构建和测试](04-build-and-test.md) | 生成器构建、模板重建与回归 |
+| [05 文法](05-grammar.md) | 文法定义文件（`.gram`）规范与生成期校验 |
 | [06 分析](06-analysis.md) | LL、LR、IELR 等算法 |
 | [07 代码生成](07-codegen.md) | 模板系统、语言后端与 C/C++ 命名风格、C++ DFA 与标准库一致性回归 |
 | [08 生成代码](08-generated-code.md) | 产物清单与 API |
-| [09 构建和测试](09-build-and-test.md) | 生成器构建、模板重建与回归 |
-| [09 封存外传](09-extra.md) | 从 02 撤下的段落，以「文法即钥匙」封存；输入那句封印语、由仓库的解析器生成器拆封 |
-| [10 示例文法](10-examples.md) | `example/` 导读 |
-| [11 工程示例](11-project-examples.md) | `project/` 导读 |
-| [12 文法使用手册](12-grammar-usage.md) | 指令、语义动作与错误恢复 |
-| [13 生成模式](13-modes.md) | 十六种生成模式与运行时 |
-| [14 目标语言与产物](14-languages-and-products.md) | 后端选择与产物形态 |
-| [15 支持矩阵](15-language-mode-support.md) | 语言、模式与增量 API 的当前范围 |
-| [16 双语、内嵌资产与发布](16-i18n-and-packaging.md) | 显示选项、内嵌手册与语言服务器、Unicode 控制台、独立 Python 打包脚本 |
-| [17 扩展正则表达式](17-regex-extensions.md) | 前瞻、词边界、忽略大小写、反向引用与 C99 有序匹配运行时 |
-| [18 Unicode 正则模式](18-regex-unicode.md) | UTF-8 码点、Unicode 17.0 属性、词边界和简单大小写折叠 |
-| [19 自定义错误提示](19-custom-error-messages.md) | 全部八种语言的错误提示回调、上下文与默认提示恢复 |
-| [20 正则运行时资源预算](20-regex-runtime-budgets.md) | 步数、工作内存、回溯、前瞻、取消及结构化失败状态 |
-| [21 正则兼容性与纯校验](21-regex-compatibility.md) | 逐规则引擎、语义保证、严格模式及不写盘校验 |
-| [22 二进制增量生成](22-incremental-generation.md) | 分析缓存、语义刷新、失效与损坏恢复、C++11 子集回归 |
-| [23 VS Code 工作流](23-vscode-workflow.md) | 大文法同步、取消、增量生成配置、工作区引用与安全重命名 |
+| [09 示例文法](09-examples.md) | `example/` 导读 |
+| [10 工程示例](10-project-examples.md) | `project/` 导读 |
+| [11 文法使用手册](11-grammar-usage.md) | 指令、语义动作与错误恢复 |
+| [12 生成模式](12-modes.md) | 十六种生成模式与运行时 |
+| [13 目标语言与产物](13-languages-and-products.md) | 后端选择与产物形态 |
+| [14 支持矩阵](14-language-mode-support.md) | 语言、模式与增量 API 的当前范围 |
+| [15 双语、内嵌资产与发布](15-i18n-and-packaging.md) | 显示选项、内嵌手册与语言服务器、Unicode 控制台、独立 Python 打包脚本 |
+| [16 扩展正则表达式](16-regex-extensions.md) | 前瞻、词边界、忽略大小写、反向引用与 C99 有序匹配运行时 |
+| [17 Unicode 正则模式](17-regex-unicode.md) | UTF-8 码点、Unicode 17.0 属性、词边界和简单大小写折叠 |
+| [18 自定义错误提示](18-custom-error-messages.md) | 全部八种语言的错误提示回调、上下文与默认提示恢复 |
+| [19 正则运行时资源预算](19-regex-runtime-budgets.md) | 步数、工作内存、回溯、前瞻、取消及结构化失败状态 |
+| [20 正则兼容性与纯校验](20-regex-compatibility.md) | 逐规则引擎、语义保证、严格模式及不写盘校验 |
+| [21 二进制增量生成](21-incremental-generation.md) | 分析缓存、语义刷新、失效与损坏恢复、C++11 子集回归 |
+| [22 VS Code 工作流](22-vscode-workflow.md) | 大文法同步、取消、增量生成配置、工作区引用与安全重命名 |
+| [23 Lepus 后端](23-lepus-backend.md) | Lepus 目标语言的生成方式、API 与支持边界 |
 | [Lepus EBNF 语法参考](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md) | 当前词法、全部产生式、匿名函数类型、泛型入口与语义检查边界 |
 | [Lepus 语言哲学](https://github.com/rabbitc999/Lepus/blob/master/doc/03-core-concepts.md) | 简单编写，到处运行；值语义、显式引用、资源管理与没有移动语义 |
 | [文档维护规范](../project/document/README.md) | 统一口径、技术文档模板、文档生成器与同步检查 |
@@ -62,11 +61,11 @@ Lepus 支持 MySQL、SQLite、PostgreSQL 与 Microsoft SQL Server / ODBC 的标�
 `std::sql`、宿主胶水 `glue/std_sql.hpp`，
 以及 Lepus 工程内的[学生信息管理示例工程](https://github.com/rabbitc999/Lepus/blob/master/example/students-server/README.md)；保留的建表 / 初始数据 /
 查询 SQL 在 `lepus/sql-lepus/sql/`，库的统一入口与后端选择见
-[19 SQL 数据库](https://github.com/rabbitc999/Lepus/blob/master/doc/33-reflection-serialization-sql.md)，详细接口见 sql-lepus 接口参考。
+[14 SQL 数据库](https://github.com/rabbitc999/Lepus/blob/master/doc/33-reflection-serialization-sql.md)，详细接口见 sql-lepus 接口参考。
 
 ## mc 连外部网络
 
-[18 TCP 与极简 HTTP](https://github.com/rabbitc999/Lepus/blob/master/doc/07-stdlib-overview.md)：标准库模块
+[13 TCP 与极简 HTTP](https://github.com/rabbitc999/Lepus/blob/master/doc/07-stdlib-overview.md)：标准库模块
 `std::net` 与宿主胶水 `glue/std_net.hpp`，
 提供 `TcpSocket` / `TcpListener`（连接超时、行读取）与 `HttpClient`（GET / POST、
 `parseUrl` / `buildRequest` / `parseResponse`）；确定性样例是
@@ -140,7 +139,7 @@ Lepus PC 字节码加密：独立 OpenSSL 工具、密钥管理与完整性验�
 
 Lepus 行级调试支持宏正文、include 与子模块来源，见 [panic 与源码行号](https://github.com/rabbitc999/Lepus/blob/master/doc/18-panic-trace.md)。
 
-[Lepus 元组只读引用回归](https://github.com/rabbitc999/Lepus/blob/master/example/samples/p2_tuple_readonly.lep)：元组元素与嵌套来源的只读引用、整体替换及独立复制；语义说明见 [04 引用与迭代](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)。
+[Lepus 元组只读引用回归](https://github.com/rabbitc999/Lepus/blob/master/example/samples/p2_tuple_readonly.lep)：元组元素与嵌套来源的只读引用、整体替换及独立复制；语义说明见 [07 引用与迭代](https://github.com/rabbitc999/Lepus/blob/master/doc/22-resource-lifetime.md)。
 
 Lepus 标准迭代器：惰性链式适配、列表引用迭代、所有权转移与消费操作。
 

@@ -1,6 +1,6 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# 08 Complete Project Example: From Grammar to a Runnable Program
+# 10 Complete Project Example: From Grammar to a Runnable Program
 
 [`project/pl0-ir/`](../../project/pl0-ir/) is a **complete C++17 project**: it uses HareParse
 to generate a PL/0 parser, then uses it to compile PL/0 programs into **triples** or
@@ -143,7 +143,7 @@ Two practical lessons:
   `\(\*([^*]|\*+[^)]+)*\*+\)`) are dropped on match; `%space` can only be configured with a whitespace character set and cannot do this.
   The benefit is that the parser itself (when called as a library via `Parser_RunText()`) understands comments, so the caller does not have to pre-strip
   the text; the `(* … *)` rule deliberately avoids a form like `\*+[^*)]` (which would generate a DFA that never accepts, see
-  [`docs/09`](../12-grammar-usage.md#commit把识别但不进语法层的文本收进容器) and
+  [`docs/09`](../11-grammar-usage.md#commit把识别但不进语法层的文本收进容器) and
   `pl0-ir/README.md`). An unterminated comment is still reported by the **read-only** `Pl0_CheckComments()`
   in `%main` as `注释没有闭合（{ 少一个 }）`.
 

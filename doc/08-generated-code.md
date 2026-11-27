@@ -1,6 +1,6 @@
-# 05 生成产物与生成代码 API
+# 08 生成产物与生成代码 API
 
-模式与语言组合统一见 [12 支持矩阵](15-language-mode-support.md)。增量 API 只在 C++17 / Rust
+模式与语言组合统一见 [14 支持矩阵](14-language-mode-support.md)。增量 API 只在 C++17 / Rust
 提供：LL/DD 同文本缓存、确定性 LR 前缀 checkpoint、GLR 家族实验缓存是三种不同能力。
 Earley/CYK 共用 GLR 实验入口，不代表实现了增量图表算法；纯度策略当前只用于 GLR 家族。
 
@@ -73,7 +73,7 @@ C++17 专有的东西时可以在文法里写 `%cpp_only`：再配 `--lang c` �
 `--lang rust` 是第五种：`source/src/code_gen_rust.cpp` + `source/templates/rust_*` 生成
 Cargo 工程（`Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`）——API、
 产物清单与「语义值必须满足 `Copy + Default + Debug`」这条硬约束见
-[`14-languages-and-products.md`](14-languages-and-products.md#rust-产物--lang-rust)。
+[`13-languages-and-products.md`](13-languages-and-products.md#rust-产物--lang-rust)。
 `%package`（crate 名）/ `%import`（`use`）/ `%class_body` 同样生效，
 **`%destructor` 不支持**（靠所有权回收，写了在生成期直接报错）；词法正则用 Rust
 **官方的 `regex` crate**（`Cargo.toml` 里一条 `regex = "1"`，`src/parser.rs` 顶部
@@ -921,7 +921,7 @@ Python 产物的词法器**不使用生成器自带的 DFA**，而是把正则�
 - C 普通 DFA 取最长接受前缀，有序运行时和大多数原生库按分支及贪婪/非贪婪顺序选择单条规则的结果。规则之间再比较长度和声明顺序。`a|ab` 等写法不能直接假定跨引擎等价。
 - C++ `dfa` 仅优化已证明等价的 ASCII 子集，其余字节规则整体回退标准库；`vm` 统一使用共享运行时，Unicode 规则始终走共享路径。
 
-每条规则的执行引擎、未确认的原生语义和校验失败原因见 [21 正则兼容性](21-regex-compatibility.md)。
+每条规则的执行引擎、未确认的原生语义和校验失败原因见 [20 正则兼容性](20-regex-compatibility.md)。
 `--check` 在内存中校验生成，`--strict-regex` 拒绝尚未证明共享等价的原生规则。
 C 和 C++ `vm` 必须能通过共享编译器；原生扩展未识别时可以警告后生成，但已知不支持的能力会报错。
 共享编译器的有界重复上限为 1000；空串模式被拒绝。
@@ -1435,4 +1435,4 @@ Go 产物的词法器**不使用生成器自带的 DFA**，而是把正则原样
 
 `ParserToken` 提供 `kind`、`text`、`offset`、`value`。Token、注释和诊断的 `offset` 均为从 0 起的 UTF-8 字节偏移。`ParserResult` 提供 `ok`、`value`、`tree`、`message`、`offset`、`comments`。在 GLR、Earley 和 CYK 中，`alternatives` 保存成功派生，`value` 和 `tree` 对应首项，`truncated` 表示路径受到栈深度限制。
 
-参见[Lepus 后端手册](17-lepus-backend.md)。
+参见[Lepus 后端手册](23-lepus-backend.md)。

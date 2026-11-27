@@ -682,7 +682,7 @@ void printUsage(const std::string &program)
         << "\n"
         << "示例：\n"
         << "  " << program << " man 01\n"
-        << "  " << program << " man 13 --lang en\n"
+        << "  " << program << " man 08 --lang en\n"
         << "  " << program << " man directives --json\n"
         << "  " << program << " man --search 展望符\n";
 }
@@ -1094,7 +1094,7 @@ int runCommandLine(int argc, char **argv)
             std::cerr << PE_TEXT("未找到手册目标：") << target << "\n";
             return 1;
         }
-        detail("directive", directiveAt(index), "12-grammar-usage");
+        detail("directive", directiveAt(index), "11-grammar-usage");
         return 0;
     }
 
@@ -1102,7 +1102,7 @@ int runCommandLine(int argc, char **argv)
     const std::size_t mode = findEntry(modeAt, modeCount(), target);
     if (mode != modeCount())
     {
-        detail("mode", modeAt(mode), "13-modes");
+        detail("mode", modeAt(mode), "12-modes");
         return 0;
     }
 
@@ -1110,7 +1110,7 @@ int runCommandLine(int argc, char **argv)
     const std::size_t languageIndex = findEntry(languageAt, languageCount(), target);
     if (languageIndex != languageCount())
     {
-        detail("language", languageAt(languageIndex), "14-languages-and-products");
+        detail("language", languageAt(languageIndex), "13-languages-and-products");
         return 0;
     }
 

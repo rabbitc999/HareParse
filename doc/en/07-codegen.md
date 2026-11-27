@@ -1,8 +1,8 @@
-# 04 Code Generation and Template System
+# 07 Code Generation and Template System
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-For the supported range of modes and incremental APIs across languages, see [12 Support Matrix](../15-language-mode-support.md) in one place.
+For the supported range of modes and incremental APIs across languages, see [14 Support Matrix](../14-language-mode-support.md) in one place.
 
 ## 1. How the output artifacts are assembled
 
@@ -151,7 +151,7 @@ For the full list of generation-time checks, see
 
 
 **Error recovery** is the second layer of runtime logic, decoupled from the analysis layer (see
-[`06-analysis.md` §2.11](../06-analysis.md#211-error-列与-sync错误恢复在分析层的落点)):
+[`06-analysis.md` §2.11](../06-analysis.md#211-error-列与-sync错误恢复在分析层的落点):
 
 - `Parser_LRRecover` in `c99_custom_lr_runtime.c.tmpl` implements a two-layer strategy — the `error`
   production (`#ifdef PARSER_TOKEN_ERROR`, pushing a zero-initialized placeholder value without consuming lookahead) takes priority,
@@ -445,7 +445,7 @@ When writing artifacts, `writeParserProject` automatically creates parent direct
 - `source/templates/RESULT.md.tmpl`: the generation info table, the artifact list, the various optional sections, conflict
   resolution and unresolved conflicts; the artifact list is expanded with `{% for file in product_files %}`, and the
   trailing "grammar analysis report" (`{{ report }}`) is guarded by `{% if full_report %}` so it is only emitted with
-  `--full-report` (see [`08-generated-code.md`](08-generated-code.md#17-resultmd-brief-by-default)).
+  `--full-report` (see [`08-generated-code.md`](08-generated-code.md#17-resultmd-brief-by-default).
 
   Its sections have two sources:
 
@@ -804,7 +804,7 @@ Key points:
 2. If you added a file, wire it up in the corresponding backend (C99 is `source/src/code_gen_c99.cpp`, and each other backend has its own
    `code_gen_<language>.cpp`; assembly is in `source/src/project.cpp`);
    at minimum re-run `python3 tools/embed_templates.py` so the inline table contains it.
-3. `make`; if necessary, per the manual smoke tests in [`09-build-and-test.md`](../09-build-and-test.md) §4,
+3. `make`; if necessary, per the manual smoke tests in [`04-build-and-test.md`](../04-build-and-test.md) §4,
    generate + compile the affected examples once.
 4. To skip inlining during development, use `SCRIPT_ENGINE_TEMPLATES=templates ./build/bin/HareParse ...`,
    but release artifacts must be re-inlined.
@@ -879,7 +879,7 @@ Across targets, distinguish matching order from character domains:
 - Ordinary C DFA rules take the longest accepting prefix. Ordered runtimes and most native libraries follow branch and greedy/lazy order inside one rule; the lexer then compares lengths and declaration order across rules. Patterns such as `a|ab` are not automatically equivalent across engines.
 - C++ `dfa` optimizes only a proven ASCII subset, otherwise all byte rules fall back to the standard library. `vm` uses shared execution throughout, and explicit Unicode rules always use the shared path.
 
-See [regex compatibility](../21-regex-compatibility.md) for each rule's engine, unverified native semantics and rejection reasons.
+See [regex compatibility](../20-regex-compatibility.md) for each rule's engine, unverified native semantics and rejection reasons.
 `--check` validates generation in memory; `--strict-regex` rejects native rules without proven shared equivalence.
 C and C++ `vm` require successful shared compilation. Unrecognized native extensions may warn and proceed, but known unsupported capabilities are rejected.
 The shared bounded-repeat limit is 1000; nullable patterns are rejected.
@@ -966,7 +966,7 @@ build scripts such as `Makefile` / `parser.csproj`.
 | --- | --- |
 | Artifacts | ① the input `.gram` (**exported byte for byte**, the file name follows the input file; when no file is given it is the built-in `default_grammar.gram`, exported as `grammar.gram`) ② its analysis report `<grammar name>.analysis.md` (`pl0.gram` → `pl0.analysis.md`) ③ `RESULT.md` (generation info + artifact list + how to use), plus `%copy` files |
 | Assembly | `generateGramProject()` in `source/src/project.cpp` + `generatorGramAnalysisMd()` / `generatorGramResultMd()` (`Project::generateParserProject` takes this path before the mode branch) |
-| Modes | All 16 modes can be exported; the report varies with the mode (LL predictive table / LR state machine and ACTION-GOTO / GLR multi-path / Earley-CYK chart / `lex` Token table), see [Support Matrix](../15-language-mode-support.md) for details |
+| Modes | All 16 modes can be exported; the report varies with the mode (LL predictive table / LR state machine and ACTION-GOTO / GLR multi-path / Earley-CYK chart / `lex` Token table), see [Support Matrix](../14-language-mode-support.md) for details |
 | Report | `<grammar name>.analysis.md` = generation info (source grammar / exported files / mode) + conflict resolution + unresolved conflicts + the full text of the analysis report from `--report` (`request.reportText`, identical word for word to `--report`); `RESULT.md` only says what was produced and how to use it, and does not repeat the report |
 | Inapplicable directives | `%namespace` / `%class` / `%package` / `%import` / `%class_body` / `%destructor` / `%cpp_only` in this tier all **emit one hint and are ignored** (no code is generated, so there is no landing spot; `%cpp_only` only constrains code generation) |
 
@@ -991,4 +991,4 @@ Use `--lang lepus` or `%lang lepus` to emit a self-contained `parser.lep` and `R
 
 DD backtracks in production order and evaluates the first complete derivation. GLR explores unresolved alternatives. Earley and CYK recognize input with their respective chart algorithms and use GLR to reconstruct derivations. The `lex` mode emits a standalone lexer.
 
-See the [generated API](08-generated-code.md#generated-lepus-api) and the [Lepus backend reference](../17-lepus-backend.md).
+See the [generated API](08-generated-code.md#generated-lepus-api) and the [Lepus backend reference](../23-lepus-backend.md).

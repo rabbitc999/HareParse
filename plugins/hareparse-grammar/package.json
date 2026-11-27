@@ -1,5 +1,5 @@
 {
-  "name": "hareparse-grammar",
+  "name": "HareParse AI Assistance",
   "version": "1.0.0",
   "private": true,
   "description": "DeepSeek Harness 插件：编写、检查、生成、构建并试跑 HareParse .gram 文法，覆盖 16 种生成模式与全部目标语言；内嵌 HareParse 原程序与起步模板。",

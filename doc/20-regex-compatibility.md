@@ -1,4 +1,4 @@
-# 正则兼容性与生成前校验
+# 20 正则兼容性与生成前校验
 
 每次生成的 `RESULT.md` 都包含逐规则的正则执行报告，列出 `%token regex`、
 `%identifier`、`%commit`、`%trivia` 的实际引擎、字符模式、使用能力、选择原因及
@@ -27,7 +27,7 @@ HareParse example/regex_budget.gram --check --cpp-lexer vm --strict-regex
 
 C++ DFA 报告和实际生成共用同一套资格判断。报告也区分“某条规则有默认预算”与
 “全部显式规则可配置共享预算”：混合标准库和 Unicode 规则的 C++ 词法器属于前者，
-不能声称所有规则都受到共享预算保护。具体接口见 [20 正则资源预算](20-regex-runtime-budgets.md)。
+不能声称所有规则都受到共享预算保护。具体接口见 [19 正则运行时资源预算](19-regex-runtime-budgets.md)。
 
 ## 严格模式的范围
 

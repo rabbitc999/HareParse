@@ -1,8 +1,8 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# 05 Generated Output Artifacts and Generated Code API
+# 08 Generated Output Artifacts and Generated Code API
 
-Mode and language combinations are listed together in [12 Support Matrix](../15-language-mode-support.md). The
+Mode and language combinations are listed together in [14 Support Matrix](../14-language-mode-support.md). The
 incremental API is provided only for C++17 / Rust: the LL/DD same-text cache, the deterministic LR prefix checkpoint,
 and the GLR-family experimental cache are three different capabilities. Earley/CYK share the GLR experimental entry
 point, which does not mean an incremental chart algorithm has been implemented; the purity strategy currently applies
@@ -79,7 +79,7 @@ take effect for this target. Error locations do not use `#line`; instead there a
 `--lang rust` is the fifth one: `source/src/code_gen_rust.cpp` + `source/templates/rust_*` generate
 a Cargo project (`Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`) — for the API,
 the product file list, and the hard constraint that "the semantic value must satisfy `Copy + Default + Debug`" see
-[`14-languages-and-products.md`](../14-languages-and-products.md#rust-产物--lang-rust).
+[`13-languages-and-products.md`](../13-languages-and-products.md#rust-产物--lang-rust).
 `%package` (crate name) / `%import` (`use`) / `%class_body` likewise take effect,
 and **`%destructor` is not supported** (ownership takes care of reclamation; writing it reports an error at
 generation time); the lexical regexes use Rust's
@@ -431,7 +431,7 @@ The error table is a **global** `static` array (the same one as `Parser_GetLastE
 `Parser_RunText` / `Parser_Run`; once `PARSER_MAX_ERRORS` entries are written, new errors are discarded and the parser
 stops recovering. Both macros use `#ifndef` fallbacks: you can set the defaults in the grammar with
 `%max_errors` / `%error_recovery_tokens` (see
-[`05-grammar.md` §2](../05-grammar.md#容量宏max_stack_depth--max_errors--error_recovery_tokens)), or override them at
+[`05-grammar.md` §2](../05-grammar.md#容量宏max_stack_depth--max_errors--error_recovery_tokens), or override them at
 compile time with `-D` (`-D` takes precedence):
 
 | Macro | Default | Grammar directive | Meaning |
@@ -953,7 +953,7 @@ Across targets, distinguish matching order from character domains:
 - Ordinary C DFA rules take the longest accepting prefix. Ordered runtimes and most native libraries follow branch and greedy/lazy order inside one rule; the lexer then compares lengths and declaration order across rules. Patterns such as `a|ab` are not automatically equivalent across engines.
 - C++ `dfa` optimizes only a proven ASCII subset, otherwise all byte rules fall back to the standard library. `vm` uses shared execution throughout, and explicit Unicode rules always use the shared path.
 
-See [regex compatibility](../21-regex-compatibility.md) for each rule's engine, unverified native semantics and rejection reasons.
+See [regex compatibility](../20-regex-compatibility.md) for each rule's engine, unverified native semantics and rejection reasons.
 `--check` validates generation in memory; `--strict-regex` rejects native rules without proven shared equivalence.
 C and C++ `vm` require successful shared compilation. Unrecognized native extensions may warn and proceed, but known unsupported capabilities are rejected.
 The shared bounded-repeat limit is 1000; nullable patterns are rejected.
@@ -1496,4 +1496,4 @@ Run the emitted `parser.lep` with `lepus run parser.lep` or compile it with `lep
 
 Token, comment, and diagnostic offsets are zero-based UTF-8 byte offsets. GLR, Earley, and CYK expose successful derivations in `ParserResult.alternatives`. The `value` and `tree` fields reflect the first alternative. `truncated` signals a path exceeded the stack-depth limit.
 
-See the [Lepus backend reference](../17-lepus-backend.md).
+See the [Lepus backend reference](../23-lepus-backend.md).

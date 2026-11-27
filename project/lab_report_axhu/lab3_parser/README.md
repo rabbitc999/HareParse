@@ -301,7 +301,7 @@ Token，分析就此中止（`-22`），语法层的 `error` 恢复没机会介�
 > （`i: (op, arg1, arg2)`）。生成器本身不需要任何改动，工程里只有文法、样例与
 > 构建脚本（注释也在文法里用 `%trivia` 交给词法器跳过）。细节见
 > [`project/pl0-ir/README.md`](../../pl0-ir/README.md) 与
-> [`../../../doc/11-project-examples.md`](../../../doc/11-project-examples.md)。
+> [`../../../doc/10-project-examples.md`](../../../doc/10-project-examples.md)。
 
 ```bash
 make                      # 先在仓库根目录构建生成器

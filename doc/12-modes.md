@@ -1,11 +1,11 @@
-# 10 生成模式与运行时（用户手册）
+# 12 生成模式与运行时（用户手册）
 
 本章从 [`README.md`](../README.md) 拆出：16 种生成模式（LL 家族 / LR 家族 / GLR / Earley / CYK /
 递归下降 `dd` / `lex`）、教学模式、Mermaid 状态机图与词法匹配顺序。
 
 各模式的形式化定义、自动机构造与冲突处理见 [`06-analysis.md`](06-analysis.md)，
 产物侧的 API 见 [`08-generated-code.md`](08-generated-code.md)。
-各语言模式与增量支持范围统一见 [12 各语言支持的模式](15-language-mode-support.md)。
+各语言模式与增量支持范围统一见 [14 各语言支持的模式](14-language-mode-support.md)。
 
 ## LR(0) / LR(1) 规范自动机模式
 
@@ -79,7 +79,7 @@ Token 表：固定字面量 / 正则 / `%identifier`）；C / C++17 的构建产
 没有分析表 / 分析栈 / `runText`，Go 的 `parser.go` 里
 没有分析表 / 分析栈 / `RunText`（只有 `Tokenize`）。
 
-`--lang gram`（[文法导出档](14-languages-and-products.md#文法导出--lang-gram)）也接受
+`--lang gram`（[文法导出档](13-languages-and-products.md#文法导出--lang-gram)）也接受
 `--mode lex`，但那一档连词法器都不生成：产物里是 `.gram` 原文件 + `RESULT.md`，
 报告里列出词法一节与 Token 表（固定字面量 / `%token regex` / `%identifier`）。
 
@@ -187,7 +187,7 @@ for token in tokens:
      同心合并省下来的状态；
    - `ielr`：拆分前后的状态数、状态拆分数、`IELR 表未消解冲突数`;
 3. 顺带把 `slr` / `lalr` / `ielr` 也改成「只报不中止」：不写 `%teach` 时这三个
-   模式严格，未消解冲突直接报错、不产出代码（见[冲突处理与优先级](12-grammar-usage.md#冲突处理与优先级)）。
+   模式严格，未消解冲突直接报错、不产出代码（见[冲突处理与优先级](11-grammar-usage.md#冲突处理与优先级)）。
 
 `ll1`（没有冲突可讲）下 `%teach` 会被忽略，并在终端上说明一句。教学模式只是
 报告层的开关，不改动产物内容；给自动机
@@ -409,7 +409,7 @@ LR(1) 状态数 / ACTION 表项数 / GOTO 转移数）与 `[IELR 状态拆分]`�
   解析中仍可能对多个候选分支执行动作，本策略不提供事务或恰好执行一次保证。
   tree 模式局部复用的是 packed forest 的共享符号节点和归约候选，公开的 `Tree`
   仍重新物化。GSS checkpoint 恢复、CST 原位修补与错误恢复状态延续尚未实现。
-  新增缓存字段及指标定义见 [12 的 Forest 修补接口](15-language-mode-support.md#forest-修补接口)。
+  新增缓存字段及指标定义见 [14 的 Forest 修补接口](14-language-mode-support.md#forest-修补接口)。
 
 ## Earley 与 CYK 图表解析
 
@@ -433,7 +433,7 @@ Earley 项集，直接处理左递归、空产生式和二义文法。`%mode cyk
 
 Earley/CYK 的 C++17 / Rust 产物也暴露 GLR 实验增量入口，限制与 GLR 相同：
 输入变化后仍重建判定图表与 GSS，但会局部修补共享 forest；尚未实现图表局部更新。
-完整支持矩阵见 [12](15-language-mode-support.md)。
+完整支持矩阵见 [14](14-language-mode-support.md)。
 
 ## 递归下降（`%mode dd`）
 

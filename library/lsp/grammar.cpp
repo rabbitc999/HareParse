@@ -607,7 +607,7 @@ void GrammarDocument::buildModel() {
             directives_.push_back(decl);
             if (directiveDetail(token.text).empty()) {
                 addDiagnostic(token.range, Severity::Error, "unknown-directive",
-                              "不认识的指令 " + token.text + "（完整指令表见 doc/12-grammar-usage.md）");
+                              "不认识的指令 " + token.text + "（完整指令表见 doc/07-grammar-usage.md）");
             }
             const std::string& name = token.text;
             const bool collects = name == "%token" || name == "%define" || name == "%regex" ||

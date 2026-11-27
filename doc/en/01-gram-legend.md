@@ -1,6 +1,6 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# A Maxed-Out Grammar and a Big Cleanup (A HareParse Side Story)
+# 01 A Maxed-Out Grammar and a Big Cleanup (A HareParse Side Story)
 
 > **That glorious chapter of Lepus**: this language grew up inside this repository early on — the
 > generator, StackVM, standard library, glue and reflection were all polished here together (the
@@ -29,7 +29,7 @@
 > **A note on scope**: the current state is six complete backends + two narrow backends, Java / JS, and sixteen modes; Chapters 2–11 and some later chapters keep the numbers and attempts as they were at the time of development. For target languages, template counts and example counts, the current source and support matrix are authoritative.
 > Lepus's source syntax already has a separate [EBNF grammar reference](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md); the old APIs and experimental schemes that appear in the story should be read as belonging to the stage they came from.
 
-> Not every language supports all sixteen modes; the current support matrix, export restrictions and the boundaries of the incremental API are in [15](../15-language-mode-support.md).
+> Not every language supports all sixteen modes; the current support matrix, export restrictions and the boundaries of the incremental API are in [14](../14-language-mode-support.md).
 
 ---
 
@@ -64,7 +64,7 @@ For that compilers course, the teacher only taught:
 The rest wasn't covered. Tangtang scored well on the exam back then, but a high score doesn't mean you've walked the parts outside the map. `HareParse` is him going back to finish that other half of the map.
 
 **The results can be checked.** The modes, languages, template counts and regression results in this text take the current source, tests,
-`AGENTS.md` and [`15`](../15-language-mode-support.md) as authoritative.
+`AGENTS.md` and [`15`](../14-language-mode-support.md) as authoritative.
 
 ---
 
@@ -378,7 +378,7 @@ Tangtang wrote the conclusion into three sentences and put them at the very fron
 
 ## Chapter 6 Switching Engines: The Rust Mode
 
-> This chapter records a historical backend transition. For current engine selection, hard errors and strict mode see [regex compatibility](../21-regex-compatibility.md).
+> This chapter records a historical backend transition. For current engine selection, hard errors and strict mode see [regex compatibility](../20-regex-compatibility.md).
 
 When the Rust backend was added back, the lexer was written following the C99 approach: at generation time each regular expression is compiled into a DFA table, the artifacts hold a `Dfa` constant plus a 256-entry character-class mapping, and at runtime it looks things up in the table. The artifacts carry no dependencies and compile fastest.
 
@@ -781,7 +781,7 @@ So the generator, encountering `%destructor` in the Rust tier, rejects it outrig
       如果你需要手动释放，请在 %class_body 里自己实现 Drop。
 ```
 
-This error was later written into `14-languages-and-products.md`: both the Rust and Go tiers don't support `%destructor`, for a one-line reason — **the target language has its own ownership; it doesn't need the generator to manage it for it.**
+This error was later written into `13-languages-and-products.md`: both the Rust and Go tiers don't support `%destructor`, for a one-line reason — **the target language has its own ownership; it doesn't need the generator to manage it for it.**
 
 > **Plain-speak aside:**  
 > In C, if you borrow something you have to return it yourself; in Rust, if you borrow something the compiler watches you until you return it.  
@@ -1310,7 +1310,7 @@ stack. Desktop and embedded thus share the same bytecode semantics, with only th
 
 Later the `.mcpp` description language was withdrawn too: application glue went back to ordinary C++, and dynamic library functions can be declared centrally in Lepus's
 `abi` block. Stage snapshots easily disguise past numbers as today's facts; the generator's language and mode
-support matrix takes [`15`](../15-language-mode-support.md) as authoritative, Lepus's syntax-compatibility baseline is in the
+support matrix takes [`15`](../14-language-mode-support.md) as authoritative, Lepus's syntax-compatibility baseline is in the
 [EBNF grammar reference](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md), the user API is in [`lepus/README.md`](https://github.com/rabbitc999/Lepus/blob/master/README.md); design evolution is maintained together
 with the language (`lepus/doc/35-lepus-story.md`). The story can remember why, and the source and tests are responsible for answering what is now.
 
@@ -1677,7 +1677,7 @@ One more thing: the students at Nanjing University hand-roll C— in a course, a
 - **The author Tangtang writes as an amateur, with no supervising teacher.** This is just for fun, and has nothing to do with any advisor, teacher, research group, course or institution.
 - **Code written in spare time.** When he saw the C— lab document for the compiler principles course at Nanjing University, he felt a quiet warmth — so there's more than one person outside the map.
 - The commands in the text are usable according to each tier's supported range: `--lang {c,cpp17,python,csharp,rust,go,java,js,gram}`, `--mode {ll0,ll1,llk,lr0,slr,lalr,lr1,ielr,lrk,lalrk,slrk,glr,earley,cyk,dd,lex}`; Java / JS currently only connect DD, Earley and CYK.
-- The details of the six complete backends, the two DD/Earley/CYK narrow backends and one export tier are in [Code Generation](../07-codegen.md), [Generated-code API](../08-generated-code.md) and [Support Matrix](../15-language-mode-support.md).
+- The details of the six complete backends, the two DD/Earley/CYK narrow backends and one export tier are in [Code Generation](../07-codegen.md), [Generated-code API](../08-generated-code.md) and [Support Matrix](../14-language-mode-support.md).
 - Development and handover experience is now maintained only in the root `AGENTS.md`; the standalone session-memory directory has been deleted, to avoid old snapshots re-polluting the current scope.
 - Lepus's own half of the map has a unified acceptance: run `sh ci/run.sh` in the repository root (or `--skip-vm-tests` for the fast tier),
   see `lepus/example/samples/interrupt*.mgl` for events / interrupts / timers, and `python lepus/gui/test_qt.py`, `python lepus/car_sim/test_car_qt.py` for the Qt GUI.
@@ -1685,9 +1685,7 @@ One more thing: the students at Nanjing University hand-roll C— in a course, a
 - To do Chapter 8's mining yourself: `sh lepus/lepus-emit/build-target.sh lepus/example/samples/containers.mgl`, then pray you don't run into a creeper.
 - To do Chapter 12's library-function swap yourself: `HareParse example/pl0.gram --out-dir /tmp/pl0_rs --lang rust`, then open `src/parser.rs` and look at the `Result` and `regex` in it — that's what Rust should look like.
 - To see what Nanjing University's C— lab looks like: flip to Appendix A and read from Tokens through to Expressions. You'll find that you're not the only one on that map.
-- A few sections were withdrawn. The passages in the main text about workplace, position, colleagues and compensation have been withdrawn as a whole and sealed into
-  [`09-extra.md`](../09-extra.md). To read that part, you'll have to summon the parser generator in the repository — it recognizes that seal.
-  How to open it, I won't say here.
+- A few sections were withdrawn. The passages in the main text about workplace, position, colleagues and compensation have been withdrawn as a whole and no longer ship with this document.
 
 
 1.2.0 also supports prefix and postfix `++` / `--`, with prefix taking the new value and postfix taking the old one. A single complete expression allows at most one increment/decrement symbol; `a=(i++)+(++i)` is illegal, with parentheses, call arguments and short-circuit branches checked together; see Increment/decrement rules and examples.

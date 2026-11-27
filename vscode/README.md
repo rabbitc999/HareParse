@@ -1,4 +1,4 @@
-# GramEditor for VS Code —— `.gram` 编辑插件
+# HareParse 文法编辑器
 
 <img src="https://raw.githubusercontent.com/rabbitc999/HareParse/master/image/gram-editor-256.png" alt="GramEditor 图标" width="96" align="right" />
 
@@ -15,7 +15,7 @@
 
 生成菜单与 `gram.defaultMode` 支持全部 16 种模式，包括 `earley` / `cyk`；
 两种图表模式支持 C++17、Python、C#、Rust、Go、Java、JavaScript 目标产物。
-菜单列出模式不代表每个语言都支持；完整组合与增量 API 见 [15 支持矩阵](https://github.com/rabbitc999/HareParse/blob/master/doc/15-language-mode-support.md)。
+菜单列出模式不代表每个语言都支持；完整组合与增量 API 见 [14 支持矩阵](https://github.com/rabbitc999/HareParse/blob/master/doc/14-language-mode-support.md)。
 
 **零依赖**：不需要 `npm install`（`package.json` 没有 `dependencies` / `devDependencies`），
 也不用打包构建。`vscode` 模块由宿主提供，其余全部用 Node 内置模块实现。
@@ -31,7 +31,7 @@
 按上次配置重跑、强制重建和可取消生成任务。生成默认启用二进制分析缓存，状态栏显示
 缓存命中和耗时，同一输出目录的任务互斥。
 
-配置示例、取消的边界与后续范围见 [23 VS Code 工作流](../doc/23-vscode-workflow.md)。
+配置示例、取消的边界与后续范围见 [22 VS Code 工作流](../doc/22-vscode-workflow.md)。
 
 1.3 版本继续加入工作区查找引用（Shift+F12）、安全重命名（F2）和跨 `%include` 跳转。
 索引复用原生扫描器，优先使用未保存的编辑内容，区分无关文法里的同名符号；
@@ -124,7 +124,7 @@ make                     # 生成 build/bin/HareParse
 | `Gram: 生成解析器…` | 依次选模式、目标语言、输出目录，调 `HareParse` 生成产物 |
 | `Gram: 预览 Token 与语法树` | `F7` 打开预览；`Ctrl+Enter` 解析输入，可保存 CSV / PNG / JPEG / SVG |
 | `Gram: 重启语言服务器` | 改完路径或重新构建后重启（状态栏右侧的 `Gram:` 也可点） |
-| `Gram: 打开文法指令手册` | 优先打开仓库里的 `../doc/12-grammar-usage.md`；仓库不在旁边时改用内嵌手册 `HareParse man 12-grammar-usage`（按界面语言取正文） |
+| `Gram: 打开文法指令手册` | 优先打开仓库里的 `../doc/11-grammar-usage.md`；仓库不在旁边时改用内嵌手册 `HareParse man 11-grammar-usage`（按界面语言取正文） |
 
 ## 开发与调试
 

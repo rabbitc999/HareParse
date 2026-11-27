@@ -1,4 +1,4 @@
-# 满级文法与一次大扫除（HareParse 外传）
+# 01 满级文法与一次大扫除（HareParse 外传）
 
 > **Lepus 的那段光辉历史**：这门语言早期就在本仓库里长大——生成器、StackVM、标准库、
 > 胶水与反射都是在这里一起打磨出来的（下面这些 Lepus 文档就是那段记录）。它现已拆分为
@@ -26,7 +26,7 @@
 > **口径说明**：当前是六个完整后端 + Java / JS 两个窄后端、十六种模式；第二～十一章及部分后续章节保留开发当时的数字和尝试。生成目标、模板数与样例数以当前源码和支持矩阵为准。
 > Lepus 的源码语法已有独立的[EBNF 语法参考](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md)；故事中出现的旧 API 与试验方案均按当时阶段阅读。
 
-> 各语言并非都支持十六种模式；当前支持矩阵、导出限制与增量 API 边界见 [15](15-language-mode-support.md)。
+> 各语言并非都支持十六种模式；当前支持矩阵、导出限制与增量 API 边界见 [14](14-language-mode-support.md)。
 
 ---
 
@@ -36,7 +36,7 @@
 
 你可以把它想成一台“语法说明书翻译机”。
 
-- 你写一份 `.gram` 文件，里面是语法规则，比如“表达式可以怎么加减乘除”。
+- 你写一份文法定义文件（后缀 `.gram`），里面是语法规则，比如“表达式可以怎么加减乘除”。
 - 它读进去，能生成八种语言的解析器代码：C99、C++17、Python、C#、Rust、Go，以及范围较窄的 Java、JavaScript/TypeScript。
 - 解析器的作用，是让程序“读懂”一段文本。
 - 它还能只输出一份分析报告，不生成代码——这一档叫 `--lang gram`。
@@ -61,7 +61,7 @@
 其他没讲。糖糖当年考试分数很高，但高分不等于自己把地图外的地方走过。`HareParse` 就是他回去补那半张地图。
 
 **结果可以复查。** 文中的模式、语言、模板数量与回归结果，以当前源码、测试、
-`AGENTS.md` 和 [`15`](15-language-mode-support.md) 为准。
+`AGENTS.md` 和 [`15`](14-language-mode-support.md) 为准。
 
 ---
 
@@ -375,7 +375,7 @@ A 在改 C99，顺手敲了 `make -C source templates`。可 `make -C source tem
 
 ## 第六章 换一台引擎：Rust 那一档
 
-> 本章记录后端演进的历史阶段。当前引擎选择、硬错误和严格模式以 [21 正则兼容性](21-regex-compatibility.md) 为准。
+> 本章记录后端演进的历史阶段。当前引擎选择、硬错误和严格模式以 [20 正则兼容性](20-regex-compatibility.md) 为准。
 
 Rust 后端加回来的时候，词法是照着 C99 那套写的：生成期把每条正则编成 DFA 表，产物里放 `Dfa` 常量 + 256 项的字符类映射，运行时查表。产物不带任何依赖，编译最快。
 
@@ -778,7 +778,7 @@ impl Drop for StrValue {
       如果你需要手动释放，请在 %class_body 里自己实现 Drop。
 ```
 
-这条报错后来写进了 `14-languages-and-products.md`：Rust 与 Go 两档都不支持 `%destructor`，理由一句话——**目标语言自己有所有权，不需要生成器替它管。**
+这条报错后来写进了 `13-languages-and-products.md`：Rust 与 Go 两档都不支持 `%destructor`，理由一句话——**目标语言自己有所有权，不需要生成器替它管。**
 
 > **说人话旁白：**  
 > C 里你借了东西要自己还，Rust 里你借了东西编译器盯着你还。  
@@ -1307,7 +1307,7 @@ lepus-emit program.quad --target embedded-cpp --heap-bytes 65536 --stack-slots 2
 
 后来 `.mcpp` 描述语言也被撤下：应用胶水回到普通 C++，动态库函数可以在 Lepus 的
 `abi` 块里集中声明。阶段快照很容易把过去的数字伪装成今天的事实；生成器的语言与模式
-支持矩阵以 [`15`](15-language-mode-support.md) 为准，Lepus 的语法兼容基线见
+支持矩阵以 [`15`](14-language-mode-support.md) 为准，Lepus 的语法兼容基线见
 [EBNF 语法参考](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md)，用户 API 见 [`lepus/README.md`](https://github.com/rabbitc999/Lepus/blob/master/README.md)；设计演进随语言
 一起维护（`lepus/doc/35-lepus-story.md`）。故事可以记住为什么，源码和测试负责回答现在是什么。
 
@@ -1673,7 +1673,7 @@ diff -r tmp/base tmp/after                             # 改口径前后：该�
 - **作者糖糖是业余写作，没有指导老师。** 这篇只是写着玩，和任何导师、老师、课题组、课程、机构都没有关系。
 - **业余时间写代码。** 看到南京大学编译原理课程的 C— 实验文档时，心里很欣慰——原来地图外面不止一个人。
 - 文中命令按各档支持范围可用：`--lang {c,cpp17,python,csharp,rust,go,java,js,gram}`、`--mode {ll0,ll1,llk,lr0,slr,lalr,lr1,ielr,lrk,lalrk,slrk,glr,earley,cyk,dd,lex}`；Java / JS 当前只接 DD、Earley 与 CYK。
-- 六个完整后端、两个 DD/Earley/CYK 窄后端和一个导出档的细节，见 [代码生成](07-codegen.md)、[产物 API](08-generated-code.md) 与 [支持矩阵](15-language-mode-support.md)。
+- 六个完整后端、两个 DD/Earley/CYK 窄后端和一个导出档的细节，见 [代码生成](07-codegen.md)、[产物 API](08-generated-code.md) 与 [支持矩阵](14-language-mode-support.md)。
 - 开发与交接经验现在只维护在根目录 `AGENTS.md`；独立会话记忆目录已经删除，避免旧快照重新污染当前口径。
 - Lepus 自己那半张地图有一套统一验收：仓库根目录跑 `sh ci/run.sh`（或 `--skip-vm-tests` 跑快档），
   事件 / 中断 / 定时器看 `lepus/example/samples/interrupt*.mgl`，Qt GUI 看
@@ -1682,9 +1682,7 @@ diff -r tmp/base tmp/after                             # 改口径前后：该�
 - 想照着第八章的剧情自己挖矿一遍：`sh lepus/lepus-emit/build-target.sh lepus/example/samples/containers.mgl`，然后祈祷不要遇到苦力怕。
 - 想照着第十二章的剧情自己换库函数一遍：`HareParse example/pl0.gram --out-dir /tmp/pl0_rs --lang rust`，然后打开 `src/parser.rs`，看看里面的 `Result` 和 `regex`——那才是 Rust 该有的样子。
 - 想看看南大的 C— 实验长什么样：翻到附录 A，从 Tokens 读到 Expressions。你会发现，那张地图上，不止你一个人。
-- 有几段被撤下来了。正文里关于工作单位、岗位、同事与薪酬的段落，已经整体撤下、封存在
-  [`09-extra.md`](09-extra.md)。想读那部分，得请出仓库里那位解析器生成器——它认得那层封条。
-  怎么开，这里不说。
+- 有几段被撤下来了。正文里关于工作单位、岗位、同事与薪酬的段落，已经整体撤下，不再随本文发布。
 
 
 1.2.0 还支持前后置 `++` / `--`，前置取新值、后置取旧值。一个完整表达式最多一个自增减符号，`a=(i++)+(++i)` 非法，括号、调用实参和短路分支合并检查；详见自增减规则与样例。

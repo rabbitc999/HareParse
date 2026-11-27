@@ -2,7 +2,7 @@
 
 <img src="image/gram-editor-256.png" alt="HareParse parser generator icon" width="120" align="right" />
 
-HareParse generates a lexer, a parser and a buildable project from a single `.gram` grammar, together
+HareParse generates a lexer, a parser and a buildable project from a single **grammar definition file** (`.gram`), together
 with an analysis report. It targets language front ends, configuration formats and teaching examples:
 **nine target languages** and **sixteen analysis modes**, with incremental APIs for C++17 and Rust.
 One grammar is both the syntax definition and the documentation — declarations such as `%token`,
@@ -28,8 +28,8 @@ On Windows the executable is `build/bin/HareParse.exe`. The default target langu
 default analysis mode is IELR(1); `--lang` and `--mode` on the command line override `%lang` and
 `%mode` in the grammar. The generated directory holds the sources, the build files and a `RESULT.md`
 report — state counts, conflicts and parseability are all in there (it is the brief form by default;
-add `--full-report` for the full analysis report at the end). For `.gram` syntax and every
-command-line option see the [usage manual](doc/12-grammar-usage.md).
+add `--full-report` for the full analysis report at the end). For grammar definition file syntax and every
+command-line option see the [usage manual](doc/11-grammar-usage.md).
 
 ## Supported target languages and analysis modes
 
@@ -43,12 +43,12 @@ command-line option see the [usage manual](doc/12-grammar-usage.md).
 
 The sixteen modes include LL, LR, GLR, Earley, CYK, recursive-descent DD and `lex`, which emits the
 lexer only. The exact coverage, limits and the C++17 / Rust incremental APIs are governed by the
-[support matrix](doc/15-language-mode-support.md).
+[support matrix](doc/14-language-mode-support.md).
 
 ## Generate Lepus code
 
 Use `--lang lepus` (or `%lang lepus` in the grammar) to generate a self-contained
-`parser.lep` and `RESULT.md` directly from `.gram`. Run or compile it with Lepus:
+`parser.lep` and `RESULT.md` directly from a grammar definition file. Run or compile it with Lepus:
 
 ```sh
 ./build/bin/HareParse example/lepus_lr1.gram --lang lepus --mode ielr --out-dir build/examples/lepus-parser
@@ -61,7 +61,7 @@ Use `--mode "LL(2)"` or `--mode "LR(2)"` to set the lookahead width, and `--mode
 The generated parser provides `Parser::runText`, `Parser::runTokens`, and syntax-tree results.
 Semantic actions and `%code` / `%main` / `%epilogue` sections must contain Lepus code.
 The default entry point reads one line from standard input; the default semantic value is `float64`.
-See the [Lepus backend reference](doc/17-lepus-backend.md) for APIs, directive limitations and
+See the [Lepus backend reference](doc/23-lepus-backend.md) for APIs, directive limitations and
 regression commands, and [`lepus_ll1.gram`](example/lepus_ll1.gram) for an LL(1) example.
 
 ## Implementation structure
@@ -71,11 +71,11 @@ regression commands, and [`lepus_ll1.gram`](example/lepus_ll1.gram) for an LL(1)
 | [`source/`](source/README.md) | The generator itself: grammar loading, per-mode front ends, code emission, diagnostics and reports |
 | [`source/templates/`](source/templates/) | Output templates per target language (filled in when a project is generated) |
 | [`example/`](example/) | Example grammars and expected output |
-| [`vscode/`](vscode/README.md) | Editor support for `.gram` (highlighting, completion, diagnostics) |
+| [`vscode/`](vscode/README.md) | Editor support for grammar definition files (`.gram`): highlighting, completion, diagnostics |
 | `library/` | General libraries alongside the generator (each with its own README); `library/transfer` lowers quadruples to target-machine code |
 
 For implementation details see the [architecture document](doc/03-architecture.md); for the trade-offs
-between modes and backends see the [support matrix](doc/15-language-mode-support.md).
+between modes and backends see the [support matrix](doc/14-language-mode-support.md).
 
 ## Build
 
@@ -129,9 +129,8 @@ python tools/package_compiler.py HareParse   # package into HareParse-<platform>
 
 ## Documentation and license
 
-The [repository documentation index](doc/01-overview.md) gathers all documents; the project stories are
-[Max-Level Grammar and a Big Cleanup](doc/02-gram-legend.md) and
-[One .gram, Eight Languages](doc/04-hareparse-story.md). Collaboration and artifact-maintenance rules
+The [repository documentation index](doc/02-overview.md) gathers all documents; the project story is
+[01 Max-Level Grammar and a Big Cleanup](doc/01-gram-legend.md). Collaboration and artifact-maintenance rules
 are in [`AGENTS.md`](AGENTS.md); the license is in [`LICENSE`](LICENSE) (MIT).
 
 English pages live in [`doc/en/`](doc/en/README.md); the low-level specifications without an English

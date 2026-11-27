@@ -1,6 +1,6 @@
-# 04 代码生成与模板系统
+# 07 代码生成与模板系统
 
-各语言的模式与增量 API 支持范围统一见 [12 支持矩阵](15-language-mode-support.md)。
+各语言的模式与增量 API 支持范围统一见 [14 支持矩阵](14-language-mode-support.md)。
 
 ## 1. 产物是怎么拼出来的
 
@@ -820,7 +820,7 @@ Token + 文法声明的 + END）与 `generatorLexResultMd()`（RESULT.md 按语�
 2. 若新增了文件，要在对应的后端里接上（C99 是 `source/src/code_gen_c99.cpp`，其余后端各自
    一个 `code_gen_<语言>.cpp`；组装在 `source/src/project.cpp`）；
    至少重跑 `python3 tools/embed_templates.py` 让内联表包含它。
-3. `make`；必要时按 [`09-build-and-test.md`](09-build-and-test.md) §4 的手工小测
+3. `make`；必要时按 [`04-build-and-test.md`](04-build-and-test.md) §4 的手工小测
    把受影响的示例生成 + 编译一遍。
 4. 开发期想跳过内联，可 `SCRIPT_ENGINE_TEMPLATES=templates ./build/bin/HareParse ...`，
    但发行产物必须重新内联。
@@ -906,7 +906,7 @@ C / C++17 / Python 完全一致（命令行 `--lang` 覆盖文法里的 `%lang`�
   .NET 的 `Regex` / `regex` 都收）。
 - **「正则能匹配空串」与引擎无关**，六档一律是硬错误（Lexer 在哪个语言里都没法前进）。
 
-逐条规则的实际引擎、已知不支持能力与严格语义校验见 [21 正则兼容性](21-regex-compatibility.md)。原生扩展的警告不代表已证明可执行。
+逐条规则的实际引擎、已知不支持能力与严格语义校验见 [20 正则兼容性](20-regex-compatibility.md)。原生扩展的警告不代表已证明可执行。
 
 ### 13.1 词法匹配（六档同一套顺序）
 
@@ -990,7 +990,7 @@ C / C++17 / Python 完全一致（命令行 `--lang` 覆盖文法里的 `%lang`�
 | --- | --- |
 | 产物 | ① 输入的那份 `.gram`（**逐字节**导出，文件名沿用输入文件；没给文件时是内建的 `default_grammar.gram`，导出名 `grammar.gram`）② 它的分析报告 `<文法名>.analysis.md`（`pl0.gram` → `pl0.analysis.md`）③ `RESULT.md`（生成信息 + 产物清单 + 怎么用），外加 `%copy` 的文件 |
 | 组装 | `source/src/project.cpp` 的 `generateGramProject()` + `generatorGramAnalysisMd()` / `generatorGramResultMd()`（`Project::generateParserProject` 在模式分岔之前先走这一条） |
-| 模式 | 16 种模式均可导出；报告随模式变化（LL 预测表 / LR 状态机与 ACTION-GOTO / GLR 多路径 / Earley-CYK 图表 / `lex` Token 表），详见 [支持矩阵](15-language-mode-support.md) |
+| 模式 | 16 种模式均可导出；报告随模式变化（LL 预测表 / LR 状态机与 ACTION-GOTO / GLR 多路径 / Earley-CYK 图表 / `lex` Token 表），详见 [支持矩阵](14-language-mode-support.md) |
 | 报告 | `<文法名>.analysis.md` = 生成信息（源文法 / 导出文件 / 模式）+ 冲突消解 + 未消解冲突 + `--report` 那份分析报告全文（`request.reportText`，与 `--report` 逐字一致）；`RESULT.md` 只讲产出了什么、怎么用，不重复贴报告 |
 | 不适用指令 | `%namespace` / `%class` / `%package` / `%import` / `%class_body` / `%destructor` / `%cpp_only` 在这一档全部**提示一句并忽略**（不生成代码，没有落点；`%cpp_only` 只约束代码生成） |
 
@@ -1016,13 +1016,13 @@ HareParse example/ielr_demo.gram --out-dir /tmp/ielr_gram --lang gram \
 否定字符类、非法 UTF-8 和空白。C++ DFA 快速路径逐字节扫描，避免把过长 UTF-8 编码误解为 ASCII。可证明等价的 ASCII 模式继续生成 DFA；其余模式整份回退到
 `std::regex`，包括 `%identifier`、`%commit`、`%trivia`，避免不同规则使用不同语义。
 
-C99 的普通 DFA 路径继续使用最长接受前缀语义；扩展模式使用有序运行时，详见 [17 扩展正则表达式](17-regex-extensions.md)。C/C++ 共用编译器已修复 `{m,n}`
+C99 的普通 DFA 路径继续使用最长接受前缀语义；扩展模式使用有序运行时，详见 [16 扩展正则表达式](16-regex-extensions.md)。C/C++ 共用编译器已修复 `{m,n}`
 误变成 `{m,}`、`{m,}` 被误报上下限错误、范围重复丢失非贪婪标记和 `\0` 被误拒绝。
 回归同时直接将共用编译器的 DFA 完整匹配结果与 `std::regex_match` 对照，验证重复边界。
 
-C++ 显式 Unicode 规则使用与 C99 共用的内嵌有序运行时，可与标准库字节规则混用，见 [18 Unicode 正则模式](18-regex-unicode.md)。
+C++ 显式 Unicode 规则使用与 C99 共用的内嵌有序运行时，可与标准库字节规则混用，见 [17 Unicode 正则模式](17-regex-unicode.md)。
 
-正则的步数、回溯、工作内存、前瞻深度、取消与结构化失败状态见 [20 正则运行时资源预算](20-regex-runtime-budgets.md)。
+正则的步数、回溯、工作内存、前瞻深度、取消与结构化失败状态见 [19 正则运行时资源预算](19-regex-runtime-budgets.md)。
 
 ## Lepus 后端
 
@@ -1030,4 +1030,4 @@ C++ 显式 Unicode 规则使用与 C99 共用的内嵌有序运行时，可与�
 
 `dd` 按产生式声明顺序回溯，找到完整匹配后执行动作。`glr` 保留未消解冲突中的候选路径。`earley` 和 `cyk` 先用各自的图表算法判定，再由 GLR 重建原文法派生。用 `lex` 生成独立词法器。模板构建时内嵌到生成器，产物可直接交给 Lepus 编译器。
 
-参见[生成 API](08-generated-code.md#lepus-生成产物与-api)和[Lepus 后端手册](17-lepus-backend.md)。
+参见[生成 API](08-generated-code.md#lepus-生成产物与-api)和[Lepus 后端手册](23-lepus-backend.md)。

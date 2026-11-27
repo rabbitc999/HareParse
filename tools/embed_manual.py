@@ -6,10 +6,10 @@
 
   * **文档页**：`doc/*.md` 的正文（UTF-8），有 `doc/en/<同名>` 时一并内联英文正文；
     另外记录短编号、文件名、标题与一句摘要。
-  * **文法指令**：从 `doc/12-grammar-usage.md` 的指令表里抽 `%指令` 与说明
+  * **文法指令**：从 `doc/11-grammar-usage.md` 的指令表里抽 `%指令` 与说明
     （中英各抽一遍，按指令名对齐）。
-  * **生成模式**：从 `doc/15-language-mode-support.md` 的矩阵表抽模式名与算法，
-    再用 `doc/13-modes.md` 的行补一句用途。
+  * **生成模式**：从 `doc/14-language-mode-support.md` 的矩阵表抽模式名与算法，
+    再用 `doc/12-modes.md` 的行补一句用途。
   * **目标语言**：同上矩阵表的表头与合计行：`--lang` 取值、显示名与支持的模式数。
   * **示例**：`example/manifest.tsv` 里登记过的示例文法（语言档与固定输入）。
 
@@ -180,7 +180,7 @@ def pages():
 def tables(path):
     """把一份 Markdown 里的表格拆成「表头 -> 行」的列表。
 
-    单元格里的 `\\|` 是转义过的竖线（`doc/12-grammar-usage.md` 的字面量表格
+    单元格里的 `\\|` 是转义过的竖线（`doc/11-grammar-usage.md` 的字面量表格
     里到处都是），只按没转义的 `|` 切。
     """
     if not os.path.isfile(path):
@@ -203,7 +203,7 @@ def tables(path):
 
 
 def directives():
-    """从 `doc/12-grammar-usage.md` 与英文版抽 `%指令`，按指令名对齐中英说明。"""
+    """从 `doc/11-grammar-usage.md` 与英文版抽 `%指令`，按指令名对齐中英说明。"""
     found = {}
 
     def collect(path, key):
@@ -220,8 +220,8 @@ def directives():
             if not entry[key]:
                 entry[key] = plain(cells[-1])
 
-    collect(os.path.join(DOC_DIR, "12-grammar-usage.md"), "summary")
-    collect(os.path.join(EN_DIR, "12-grammar-usage.md"), "summaryEn")
+    collect(os.path.join(DOC_DIR, "11-grammar-usage.md"), "summary")
+    collect(os.path.join(EN_DIR, "11-grammar-usage.md"), "summaryEn")
     return [found[name] for name in sorted(found)]
 
 
@@ -272,12 +272,12 @@ def mode_matrix(path):
 
 
 def modes():
-    """模式名与算法取自支持矩阵；用途一句取自 `doc/13-modes.md`（中英各一遍）。"""
-    _, descriptions = mode_matrix(os.path.join(DOC_DIR, "15-language-mode-support.md"))
-    _, descriptions_en = mode_matrix(os.path.join(EN_DIR, "15-language-mode-support.md"))
+    """模式名与算法取自支持矩阵；用途一句取自 `doc/12-modes.md`（中英各一遍）。"""
+    _, descriptions = mode_matrix(os.path.join(DOC_DIR, "10-language-mode-support.md"))
+    _, descriptions_en = mode_matrix(os.path.join(EN_DIR, "10-language-mode-support.md"))
     purposes, purposes_en = {}, {}
-    for path, target in ((os.path.join(DOC_DIR, "13-modes.md"), purposes),
-                         (os.path.join(EN_DIR, "13-modes.md"), purposes_en)):
+    for path, target in ((os.path.join(DOC_DIR, "08-modes.md"), purposes),
+                         (os.path.join(EN_DIR, "08-modes.md"), purposes_en)):
         for _, cells in tables(path):
             if len(cells) >= 3:
                 name = plain(cells[0]).lower()
@@ -344,7 +344,7 @@ def main():
     page_list = pages()
     directive_list = directives()
     mode_list = modes()
-    language_list, _ = mode_matrix(os.path.join(DOC_DIR, "15-language-mode-support.md"))
+    language_list, _ = mode_matrix(os.path.join(DOC_DIR, "14-language-mode-support.md"))
     example_list = examples()
 
     # 正文（中英各一遍）拼接后整体压缩：跨页的重复也能被利用。

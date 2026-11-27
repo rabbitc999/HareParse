@@ -1,6 +1,8 @@
-# 02 `.gram` 文法规范
+# 05 文法定义文件（`.gram`）规范
 
-`%lang` 与 `%mode` 的可用组合见 [12 各语言支持的模式](15-language-mode-support.md)；
+本文所说的**文法定义文件**，指后缀为 `.gram` 的 UTF-8 文本文件：词法声明（`%token`、`%identifier`、`%trivia` 等）与产生式写在同一份文件里，编译器和文档共用这一份源。
+
+`%lang` 与 `%mode` 的可用组合见 [14 各语言支持的模式](14-language-mode-support.md)；
 前端识别某种模式不代表每个后端都能生成该模式。
 
 ## 1. 词法层面的写法
@@ -35,7 +37,7 @@ expr := expr PLUS term { $$ = $1 + $3; }
 | `%lookahead N`（等价命令行 `--lookahead N`） | 展望符长度 k：N 取 **0..INT_MAX**、缺省 **2**——**没有策略上限，大 k 代价自负**（见下面「k 的取值」），只对 `ll0` / `llk` / `lrk` / `lalrk` / `slrk` 有意义（N = 0 只有 LL 家族有意义，就是 LL(0)），写成别的模式直接报错。N = 1 时这几种分别等价于 `ll1` / `ll1` / `lr1` / `lalr` / `slr` |
 | `%teach`（等价命令行 `--teach` / `--no-teach`） | 打开教学模式：`slr` / `lalr` / `ielr` 的未消解冲突只报不中止，报告多出 `[教学提示]` / `[教学对照]`；缺省**关闭**，`--no-teach` 可覆盖文法里的 `%teach`；`ll1` 下被忽略并提示一句。与 `%mermaid` 相互独立。见 [`06-analysis.md`](06-analysis.md) §5 |
 | `%mermaid`（等价命令行 `--mermaid` / `--no-mermaid`） | 生成 [Mermaid 状态机图](https://mermaid.js.org/)：产物里多出 `mermaid/` 目录（文法 LR 自动机 + 词法 DFA）；缺省**关闭**，`--no-mermaid` 可覆盖文法里的 `%mermaid`；与教学模式无关。见 [`07-codegen.md`](07-codegen.md) |
-| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | 产物语言；与命令行 `--lang` 不一致时以命令行为准，都缺省时取 `cpp17`。`python` 出免编译的 `parser.py` / `main.py`（见下面的 `%class` 一节），`csharp` 出 `Parser.cs` / `Token.cs` / `Program.cs` / `parser.csproj`，`rust` 出 Cargo 工程 `Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`，`go` 出 Go 模块 `go.mod` + `parser.go` / `token.go` / `main.go`（三者都见下面的 `%package` / `%import` / `%class_body` 一节）；`gram` 是**文法导出档**：不生成任何代码，只把 `.gram` 原文件与分析报告 `RESULT.md` 导出到 `--out-dir`（见 [`14-languages-and-products.md`](14-languages-and-products.md#文法导出--lang-gram)） |
+| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | 产物语言；与命令行 `--lang` 不一致时以命令行为准，都缺省时取 `cpp17`。`python` 出免编译的 `parser.py` / `main.py`（见下面的 `%class` 一节），`csharp` 出 `Parser.cs` / `Token.cs` / `Program.cs` / `parser.csproj`，`rust` 出 Cargo 工程 `Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`，`go` 出 Go 模块 `go.mod` + `parser.go` / `token.go` / `main.go`（三者都见下面的 `%package` / `%import` / `%class_body` 一节）；`gram` 是**文法导出档**：不生成任何代码，只把 `.gram` 原文件与分析报告 `RESULT.md` 导出到 `--out-dir`（见 [`13-languages-and-products.md`](13-languages-and-products.md#文法导出--lang-gram)） |
 | `%namespace NAME` | C++17 产物的命名空间名与文件名前缀（命令行 `--namespace` 优先）。NAME 取 `[A-Za-z_][A-Za-z0-9_]*`、不能是 C++ 关键字、不支持 `::`；不写时用默认 `Parser` + 不带前缀的文件名 |
 | `%prefix NAME` | C99 公开符号前缀（命令行 `--prefix` 优先）；不能以 `Parser` / `PARSER` 开头；只对 `--lang c` 生效，其它语言提示并忽略 |
 | `%class NAME` | Python 产物的解析器类名（命令行 `--class` 优先；不写是 `Parser`）。NAME 取 `[A-Za-z_][A-Za-z0-9_]*`、不能是 Python 关键字；只对 `--lang python` 有效，配 C / C++17 直接报错 |
@@ -77,7 +79,7 @@ expr := expr PLUS term { $$ = $1 + $3; }
 | `%main` | 段标记：之后的正文替换产物 `main.c`（C++17 是 `main.cpp`，Python 是 `main.py` 的演示体）里的内建 demo main |
 | `%cpp_only` | 声明「这份文法只能生成 C++17 产物」：命令行再写 `--lang c` / `--lang python` / `--lang csharp` / `--lang rust` / `--lang go` 会直接报错（`%lang` 里写那几个也一样）。文法依赖 C++17 产物才有的东西（`Engine`、`std::string_view`、兼容层）时用它提前拦住误用 |
 | `%naming_style legacy\|snake_case` | 选择 C99 / C++17 产物的命名风格，默认 `legacy`，命令行 `--naming-style` 优先，只能声明一次。 |
-| `%cpp_lexer std\|dfa\|vm` | C++17 词法引擎，命令行 `--cpp-lexer` 优先。`std`（缺省）使用标准库字节正则；`dfa` 只优化已证明等价的 ASCII 子集，其余回退标准库；`vm` 将全部规则编译到支持资源预算的有序运行时。显式 `(?u)` 规则始终使用共享运行时。非 C++ 目标不接受文法中的此指令。详见 [正则资源预算](20-regex-runtime-budgets.md)。 |
+| `%cpp_lexer std\|dfa\|vm` | C++17 词法引擎，命令行 `--cpp-lexer` 优先。`std`（缺省）使用标准库字节正则；`dfa` 只优化已证明等价的 ASCII 子集，其余回退标准库；`vm` 将全部规则编译到支持资源预算的有序运行时。显式 `(?u)` 规则始终使用共享运行时。非 C++ 目标不接受文法中的此指令。详见 [正则资源预算](19-regex-runtime-budgets.md)。 |
 | `%tree` | 生成 CST 接口，纯 `%tree` 文法可以不写语义动作 |
 | `%left` / `%right` / `%nonassoc` | 声明 Token 结合性与优先级，行越靠下优先级越高 |
 | `%prec TOKEN` | 写在分支右部末尾，覆盖该产生式的优先级来源 |
@@ -338,7 +340,7 @@ C++17 产物（`--lang cpp17`）的命名空间名与文件名前缀都用这个
   直接报错，而不是静默忽略；`--lang python` 同样报错（Python 里改的类名用 `%class`）。
 
 用途是多实例共存：C++ 下同时链接两个生成器产物时，命名空间与文件名都不再撞车
-（细节与注意事项见 [`14-languages-and-products.md`](14-languages-and-products.md)
+（细节与注意事项见 [`13-languages-and-products.md`](13-languages-and-products.md)
 的「换掉命名空间与文件名前缀」一节）。示例：
 `example/namespace_demo.gram`。
 
@@ -551,7 +553,7 @@ double MyHelper(double x)
 - **Python 产物下没有 `parser_user.h`，也没有 `#line`**（Python 没这条指令）；
   正文按 Python 缩进规则归一化（去公共缩进、行首 tab 换 4 空格）后追加到
   `parser.py` 末尾，前面贴一行 `# 语法文件 <文法文件> 行 <N>` 的注释标出它在
-  `.gram` 里的位置（与 C 目标 `#line` 指向同一行，见
+  文法定义文件里的位置（与 C 目标 `#line` 指向同一行，见
   [`07-codegen.md`](07-codegen.md) §4.2），正文与解析器类同一个模块，可以直接叫
   类里的内部方法；
 - 不新增产物文件——它就是 `parser.c` 的一部分；
@@ -652,7 +654,7 @@ int main(void)
   `Parser_RunText("a\nb\n", &result)` / `engine.runText("a\nb\n", &result)` /
   `engine.run_text("a\nb\n")`。
 
-完整例子见 `example/space_demo.gram`（配 [`10-examples.md`](10-examples.md)）。
+完整例子见 `example/space_demo.gram`（配 [`09-examples.md`](09-examples.md)）。
 
 ### 词法后处理与占位 Token
 
@@ -811,8 +813,8 @@ CSV、用一条 `%token` 指令追加进来：
   `""` 表示一个双引号、字段内逗号；**不支持跨行字段**。
 - 第 1 列 / 第 2 列为空都报错；第 1 / 2 列前后空白**不自动裁剪**（字面量里的
   空格有意义）。
-- CSV 路径相对**声明它的那份 `.gram` 文件所在目录**解析，允许子目录。
-- 同一 `.gram` 内多处引用同一份 CSV 时按规范化路径缓存读盘结果。
+- CSV 路径相对**声明它的那份文法定义文件所在目录**解析，允许子目录。
+- 同一份文法定义文件内多处引用同一份 CSV 时按规范化路径缓存读盘结果。
 
 **第 2 列一律按字面量处理，绝不解析成正则**：要正则 Token 继续用
 `%token regex NAME "…"`；本指令不提供正则通道，也不读取 CSV 里的正则列，
@@ -864,7 +866,7 @@ CSV 内的错误用**相对 `.gram` 目录的路径**；`%token … include` 这
 - 模式必须是双引号字面量；没有正则元字符的写法（如 `"//"`）就是固定字面量。
   C 支持 DFA 与共享有序运行时，非贪婪、断言、反向引用由有序运行时执行；
   C++ 根据 `std` / `dfa` / `vm` 配置选择引擎。空串模式会被拒绝；
-  原生扩展的校验边界见 [21 正则兼容性](21-regex-compatibility.md)。
+  原生扩展的校验边界见 [20 正则兼容性](20-regex-compatibility.md)。
 - `%commit` 的匹配与 `%token`（固定字面量 / `%token regex`）以及内建注释规则
   走**同一份词法匹配顺序**：先按最长匹配，长度相同时按声明先后（先声明优先；
   同一行内按书写顺序）。**同一个模式不能既当 Token 又当 `%commit` /
@@ -880,7 +882,7 @@ CSV 内的错误用**相对 `.gram` 目录的路径**；`%token … include` 这
   Python `engine.commits`、C# `Commits`、Rust `engine.commits()`、
   Go `engine.Commits()`）。容器的字段与
   所有权细节见
-  [`14-languages-and-products.md`](14-languages-and-products.md)。
+  [`13-languages-and-products.md`](13-languages-and-products.md)。
 
 完整例子见 `example/commit_demo.gram`。
 
@@ -913,7 +915,7 @@ CSV 内的错误用**相对 `.gram` 目录的路径**；`%token … include` 这
 分组后的 `*` 允许零个或多个正文片段；漏掉这个量词会改变正则语言，不能据此认定
 否定类或 DFA 构造有错。C DFA、C++ 标准库和共享有序运行时均验证了空正文、普通文本、
 连续星号和中文正文。非贪婪表达式也可用，C 会选择共享有序运行时。
-实际引擎和跨目标语义保证以 [21 正则兼容性报告](21-regex-compatibility.md) 为准。
+实际引擎和跨目标语义保证以 [20 正则兼容性报告](20-regex-compatibility.md) 为准。
 
 ### 四个「写用户代码的地方」怎么分工
 
@@ -1194,6 +1196,6 @@ LL 家族**不写任何恢复指令也有恢复**——运行时会自动按下�
 - 动作翻译：`source/src/action_translator.cpp`
 - 正则编译：`source/src/regex_dfa.cpp`
 
-扩展正则的前瞻、词边界、`(?i)` 和数字反向引用，见 [17 扩展正则表达式](17-regex-extensions.md)。
+扩展正则的前瞻、词边界、`(?i)` 和数字反向引用，见 [16 扩展正则表达式](16-regex-extensions.md)。
 
-显式 `(?u)` / `(?iu)` 模式及 Unicode 属性、边界和码点长度，见 [18 Unicode 正则模式](18-regex-unicode.md)。
+显式 `(?u)` / `(?iu)` 模式及 Unicode 属性、边界和码点长度，见 [17 Unicode 正则模式](17-regex-unicode.md)。

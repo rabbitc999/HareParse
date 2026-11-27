@@ -1,13 +1,13 @@
-# 09 用 `.gram` 写文法（用户手册）
+# 11 用文法定义文件写文法（用户手册）
 
-本章从 [`README.md`](../README.md) 拆出：`.gram` 指令表、语义动作、语义值类型与用户代码注入、
+本章从 [`README.md`](../README.md) 拆出：文法定义文件（`.gram`）的指令表、语义动作、语义值类型与用户代码注入、
 冲突消解、错误恢复、条件编译（`%if`）、自定义入口（`%main` / `%epilogue`）与报错定位（`#line`）。
 
 规范与生成期校验的细节见 [`05-grammar.md`](05-grammar.md)，翻译与模板的实现见
 [`07-codegen.md`](07-codegen.md)，产物侧的 API 见 [`08-generated-code.md`](08-generated-code.md)。
-选择目标语言与模式前，先查 [12 各语言支持的模式与增量 API](15-language-mode-support.md)。
+选择目标语言与模式前，先查 [14 各语言支持的模式与增量 API](14-language-mode-support.md)。
 
-## `.gram` 文法写法
+## 文法定义文件的写法
 
 规则有两种写法：**一行一条**（同名左部写多行即可），或 yacc 风格的 `|` 分支
 （同一左部的多个分支写在一起）。分支写法每个分支各带自己的动作，整条规则**必须
@@ -33,11 +33,11 @@ initializer := assignment_expression        { $$ = $1; }
 | `%space "空白字符集"` | 取 Token 前跳过哪些空白（缺省 `"\b"` = 全部空白；`%space ""` = 一个都不跳过）。`\b` 写在 `%token` 里是「一个空白字符」的通配，写在 `%space` 里代表全部空白 |
 | `%start name` | 起始非终结符（缺省取第一条规则的左部） |
 | `%example "文本"` | 生成文档所用的示例输入；最多一次，支持 `\\`、`\"`、`\n`、`\t` 等字符串转义，`\0` 因无法通过命令行传递而拒绝。八种代码后端的 `RESULT.md` 会在命令行与 API 示例中使用它；没写时显示 `<符合文法的语言>` |
-| `%mode ll1 \| ll0 \| llk \| lr0 \| slr \| slrk \| lalr \| lalrk \| lr1 \| lrk \| ielr \| glr \| earley \| cyk \| dd \| lex` | 生成模式；与命令行 `--mode` 不一致时以命令行为准，缺省 `ielr`。`earley` / `cyk` 支持 C++17、Python、C#、Rust 产物；各模式说明见[生成模式与运行时](13-modes.md) |
+| `%mode ll1 \| ll0 \| llk \| lr0 \| slr \| slrk \| lalr \| lalrk \| lr1 \| lrk \| ielr \| glr \| earley \| cyk \| dd \| lex` | 生成模式；与命令行 `--mode` 不一致时以命令行为准，缺省 `ielr`。`earley` / `cyk` 支持 C++17、Python、C#、Rust 产物；各模式说明见[生成模式与运行时](12-modes.md) |
 | `%lookahead N`（或写进模式名 `LL(2)`；命令行 `--lookahead N`） | 展望符长度 k，取 0..INT_MAX、缺省 2；只对 `lrk` / `lalrk` / `slrk` / `llk` / `ll0` 有意义（别的模式写了直接报错）。N = 1 时分别等价于 `lr1` / `lalr` / `slr` / `ll1`。**没有策略上限**，但 k 一大 `FIRST_k` / `FOLLOW_k` 与列数就指数级膨胀（列编码放不进 64 位时生成期会报错并给出本文法上限） |
-| `%teach` | 打开[教学模式](13-modes.md#教学模式教学提示与教学对照)；等价于命令行 `--teach`（`--no-teach` 可反向覆盖），缺省**关闭** |
-| `%mermaid` | 生成 [Mermaid 状态机图](13-modes.md#状态机图示mermaid)；等价于命令行 `--mermaid`（`--no-mermaid` 可反向覆盖），缺省**关闭**；与 `%teach` 相互独立 |
-| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | 产物语言；与命令行 `--lang` 不一致时以命令行为准，都缺省时取 `cpp17`。`gram` 不生成代码：只导出文法原文件 + 分析报告，见 [`14-languages-and-products.md`](14-languages-and-products.md#文法导出--lang-gram) |
+| `%teach` | 打开[教学模式](12-modes.md#教学模式教学提示与教学对照)；等价于命令行 `--teach`（`--no-teach` 可反向覆盖），缺省**关闭** |
+| `%mermaid` | 生成 [Mermaid 状态机图](12-modes.md#状态机图示mermaid)；等价于命令行 `--mermaid`（`--no-mermaid` 可反向覆盖），缺省**关闭**；与 `%teach` 相互独立 |
+| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | 产物语言；与命令行 `--lang` 不一致时以命令行为准，都缺省时取 `cpp17`。`gram` 不生成代码：只导出文法原文件 + 分析报告，见 [`13-languages-and-products.md`](13-languages-and-products.md#文法导出--lang-gram) |
 | `%class NAME` | Python 产物的解析器类名（等价于 `--class`，命令行优先；缺省 `Parser`）；NAME 取 `[A-Za-z_][A-Za-z0-9_]*`、不能是 Python 关键字；只对 `--lang python` 有效，配 C / C++17 会报错 |
 | `%package NAME` | C# 的 `namespace NAME;` / Rust 的 crate 名（`Cargo.toml` 的 `package.name`）/ Go 的 module path（`go.mod` 的 `module`，`::` 归一成 `/`）；NAME 取分段标识符（`.` 或 `::` 连接，例如 `MyApp.Compiler`）；只对 `--lang csharp` / `--lang rust` / `--lang go` 有效，别的目标语言下提示一句并忽略 |
 | `%import NAME` | C# 的 `using NAME;` / Rust 的 `use NAME;` / Go 的 `import ( … )`（`::` 归一成 `/`，与标准库重复的包跳过）；可重复，末段可以是 `*`（如 `System.Collections.*`）；只对 csharp / rust / go 有效，别的目标语言下提示一句并忽略 |
@@ -77,9 +77,9 @@ initializer := assignment_expression        { $$ = $1; }
 | `%left` / `%right` / `%nonassoc` | 声明 Token 的结合性与优先级，行内自左向右递增，后声明的行更高 |
 | `%prec TOKEN` | 写在产生式右部末尾，覆盖该产生式的优先级来源 |
 | `%expect N` | 允许保留 N 个未消解的移进/归约冲突 |
-| `%token regex NAME "正则"` | 用正则定义 Token（C 使用 DFA 或共享有序运行时；C++ 支持 `std` / `dfa` / `vm`，Unicode 规则使用共享运行时；其他目标使用原生库。逐规则选择见 [兼容性报告](21-regex-compatibility.md)） |
+| `%token regex NAME "正则"` | 用正则定义 Token（C 使用 DFA 或共享有序运行时；C++ 支持 `std` / `dfa` / `vm`，Unicode 规则使用共享运行时；其他目标使用原生库。逐规则选择见 [兼容性报告](20-regex-compatibility.md)） |
 | `%naming_style legacy\|snake_case` | 选择 C99 / C++17 产物的命名风格，默认 `legacy`，命令行 `--naming-style` 优先，只能声明一次。 |
-| `%cpp_lexer std\|dfa\|vm` | C++17 词法引擎，命令行 `--cpp-lexer` 优先。`std`（缺省）使用标准库字节正则；`dfa` 只优化已证明等价的 ASCII 子集，其余回退标准库；`vm` 将全部规则编译到支持资源预算的有序运行时。显式 `(?u)` 规则始终使用共享运行时。非 C++ 目标不接受文法中的此指令。详见 [正则资源预算](20-regex-runtime-budgets.md)。 |
+| `%cpp_lexer std\|dfa\|vm` | C++17 词法引擎，命令行 `--cpp-lexer` 优先。`std`（缺省）使用标准库字节正则；`dfa` 只优化已证明等价的 ASCII 子集，其余回退标准库；`vm` 将全部规则编译到支持资源预算的有序运行时。显式 `(?u)` 规则始终使用共享运行时。非 C++ 目标不接受文法中的此指令。详见 [正则资源预算](19-regex-runtime-budgets.md)。 |
 | `%identifier "正则"` | 声明标识符正则，生成标识符识别与关键字查表接口 |
 | `%commit [类型] "模式"` / `%commit skip "模式"` | 把「识别但不进语法层」的文本收进容器（元素 `{line, type, text}`）；类型缺省 `default`，`skip` 匹配即丢。模式按正则编译，与 `%token` 同一份最长匹配顺序（同长度按声明先后）；见 [`%commit`](#commit把识别但不进语法层的文本收进容器)。**六档都支持**（C99 / C++17 / Python / C# / Rust / Go），各档的容器类型与所有权见 [`08-generated-code.md`](08-generated-code.md) |
 | `%trivia keep "模式"` | 保留注释匹配的完整原文和输入位置，语法分析仍跳过它 |
@@ -87,7 +87,7 @@ initializer := assignment_expression        { $$ = $1; }
 | `%copy [file\|dir] 路径` | 把文法目录下的库文件 / 目录拷进产物目录；缺省 `file`，拷进来的 `.c`/`.h` 会进 `Makefile` / `CMakeLists.txt` |
 | `%include "路径"` | 文件级包含：把被引 `.gram` 的内容**内联**进来（也接受 `%include='路径'` 与单引号，必须单独成行）。相对路径按包含它的文件所在目录解析，支持递归与循环检测；`%code` / `%class_body` / `%epilogue` / `%main` 段内不展开。内联后报错行号指向拼接后的文本（含被引文件内容） |
 | `%build_files on\|off` | 是否导出工程构建文件（`Makefile` / `CMakeLists.txt`），等价命令行 `--build-files` / `--no-build-files`（命令行优先），只能声明一次 |
-| `%cpp_only` | 声明「这份文法只能生成 C++17 产物」：配 `--lang c` / `--lang python` / `--lang csharp` / `--lang rust` / `--lang go`（或 `%lang` 里写那几个）直接报错，见[只能出 C++17 的文法](14-languages-and-products.md#只能出-c17-的文法cpp_only) |
+| `%cpp_only` | 声明「这份文法只能生成 C++17 产物」：配 `--lang c` / `--lang python` / `--lang csharp` / `--lang rust` / `--lang go`（或 `%lang` 里写那几个）直接报错，见[只能出 C++17 的文法](13-languages-and-products.md#只能出-c17-的文法cpp_only) |
 
 ### 用 CSV 维护字面量别名表
 
@@ -123,7 +123,7 @@ NOT_TOKENS,"这一行也会被忽略",不在文法里,
 - **别名必须唯一**：同一个 Token 下重复别名静默去重；不同 Token 用同一个别名
   报错（错误指向 CSV 行与首次分配处）；别名撞上已声明的 Token 名也报错。
   `%token regex` 不参与这个判定。
-- 路径相对**声明它的那份 `.gram` 文件所在目录**解析，允许子目录；同一份 CSV
+- 路径相对**声明它的那份文法定义文件所在目录**解析，允许子目录；同一份 CSV
   被多处引用时只读一次。
 - `%if` 假分支包住的 `%token ... include` **不读 CSV**（条件编译在展开之前跑）。
 - **编辑器也认识这条**：`library/lsp/` 与跟着它的 VS Code 插件
@@ -166,7 +166,7 @@ program := NUMBER "+" NUMBER;
 ```
 
 规则：模式是正则（没有元字符的写法就是固定字面量；C/C++ 共享运行时支持非贪婪，
-引擎选择见 [兼容性报告](21-regex-compatibility.md)）；匹配到的文本**不进语法层、
+引擎选择见 [兼容性报告](20-regex-compatibility.md)）；匹配到的文本**不进语法层、
 也不当 Token**，
 而是按出现顺序追加进容器，元素是 `{line, type, text}`——`line` 是片段起始的
 1-based 行号，`text` 是原文（含字面量本身，跨行片段保留换行）。匹配与
@@ -212,7 +212,7 @@ CRLF 行尾）。
 分组后的 `*` 允许零个或多个正文片段；漏掉这个量词会改变正则语言，不能据此认定
 否定类或 DFA 构造有错。C DFA、C++ 标准库和共享有序运行时均验证了空正文、普通文本、
 连续星号和中文正文。非贪婪表达式也可用，C 会选择共享有序运行时。
-实际引擎和跨目标语义保证以 [21 正则兼容性报告](21-regex-compatibility.md) 为准。
+实际引擎和跨目标语义保证以 [20 正则兼容性报告](20-regex-compatibility.md) 为准。
 
 ## 语义动作
 
@@ -257,7 +257,7 @@ CRLF 行尾）。
 写了 `%value_type` 时用户代码里也不能再定义 `ParserValue_T`。
 
 各档产物的语义值类型对照（C# 要写目标语言自己的类型名）见
-[`14-languages-and-products.md`](14-languages-and-products.md)：C# 都没写时
+[`13-languages-and-products.md`](13-languages-and-products.md)：C# 都没写时
 是 `object`；`%union` 在 C# 生成带成员字段的类
 （成员按各语言的字段写法写，段与段之间照旧用 `;` 分隔）。
 
@@ -272,7 +272,7 @@ CRLF 行尾）。
 
 Python 产物（`--lang python`）下这段正文不生成 `parser_user.h`，而是插在
 `parser.py` 的 `import` 之后（缩进按 Python 规则归一化，见
-[Python 产物](14-languages-and-products.md#python-产物给文法做快速分析--lang-python)）。
+[Python 产物](13-languages-and-products.md#python-产物给文法做快速分析--lang-python)）。
 
 ```text
 %code
@@ -443,7 +443,7 @@ void          Parser_TreeFree(ParserTree_T *pRoot);
   IELR 仍然会先按 LR(1) 上下文拆分状态，拆到头还冲突才走这条。
 - **`lr0` / `lr1` 是例外，任何模式下都不中止**：这两个模式本来就要把「文法不够
   强」摆出来，未消解冲突只写进报告的 `[未消解冲突]`，表项按 yacc 默认（移进
-  优先）继续写（见 [LR(0) / LR(1) 规范自动机模式](13-modes.md#lr0--lr1-规范自动机模式)）。
+  优先）继续写（见 [LR(0) / LR(1) 规范自动机模式](12-modes.md#lr0--lr1-规范自动机模式)）。
 - **`slr` / `lalr` / `ielr` 开了教学模式（`%teach` / `--teach`）才放行**：这时
   不因未消解冲突中止，只在报告里写清「该文法不是 X 文法」与冲突清单，表项按
   移进优先继续生成。不写 `%teach` 时这三个模式严格：未消解冲突直接报错、
@@ -499,7 +499,7 @@ expr := NUMBER { $$ = $1; }
 - **一次解析最多报 `PARSER_MAX_ERRORS`（8）条错**：用 `Parser_GetErrorCount()` /
   `Parser_GetError(index)` 逐条取，`Parser_GetLastError()` 仍然是最后一条。恢复过程中
   报过错但最终解析成功时返回值仍是 `PARSER_OK`，结果可能不完整，调用方看
-  `Parser_GetErrorCount()` 决定要不要信任它（见[生成代码的 API](14-languages-and-products.md#生成代码的-api)）。
+  `Parser_GetErrorCount()` 决定要不要信任它（见[生成代码的 API](13-languages-and-products.md#生成代码的-api)）。
 - **容量宏可以在文法里定**：`%max_errors N` / `%error_recovery_tokens N`（还有
   `%max_stack_depth N`）改的就是产物里 `#ifndef` 兜底的那个值，编译期 `-D` 仍然优先。
 - **弹栈丢掉的语义值由用户清理**：写了 `%union` 时首选 `%destructor <成员> { ... }`
@@ -763,4 +763,4 @@ lepus run out/lepus/parser.lep
 
 语义动作以及 `%code`、`%main`、`%epilogue` 使用 Lepus 语法。`$$` 表示结果，`$n` 表示从 1 起的右部语义值。默认语义值类型为 `float64`，可用 `%value_type` 指定 Lepus 类型。`%trivia keep` 保留注释原文和位置。`%postlex` 逐 Token 处理，`%posttokens include "token_filter.lep"` 在语法分析前处理整批 Token。纯词法模式可通过 `Parser::tokenize` 读取 Token。
 
-参见[模式支持矩阵](15-language-mode-support.md)、[生成 API](08-generated-code.md#lepus-生成产物与-api)和[Lepus 后端手册](17-lepus-backend.md)。
+参见[模式支持矩阵](14-language-mode-support.md)、[生成 API](08-generated-code.md#lepus-生成产物与-api)和[Lepus 后端手册](23-lepus-backend.md)。

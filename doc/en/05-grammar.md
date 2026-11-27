@@ -1,8 +1,8 @@
-# 02 `.gram` Grammar Specification
+# 05 `.gram` Grammar Specification
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-The available combinations of `%lang` and `%mode` are listed in [12 Modes Supported by Each Language](../15-language-mode-support.md);
+The available combinations of `%lang` and `%mode` are listed in [14 Modes Supported by Each Language](../14-language-mode-support.md);
 the front end recognizing a mode does not mean every backend can generate it.
 
 ## 1. Lexical-Level Syntax
@@ -37,7 +37,7 @@ expr := expr PLUS term { $$ = $1 + $3; }
 | `%lookahead N` (equivalent to command-line `--lookahead N`) | The lookahead length k: N ranges over **0..INT_MAX**, defaulting to **2** — **there is no policy limit, and a large k is at your own risk** (see "Values of k" below); it is meaningful only for `ll0` / `llk` / `lrk` / `lalrk` / `slrk` (N = 0 is meaningful only for the LL family, i.e. LL(0)), and writing it with any other mode is a direct error. For N = 1, these are equivalent to `ll1` / `ll1` / `lr1` / `lalr` / `slr` respectively |
 | `%teach` (equivalent to command-line `--teach` / `--no-teach`) | Turns on teaching mode: the unresolved conflicts of `slr` / `lalr` / `ielr` are reported but do not abort, and the report gains `[教学提示]` / `[教学对照]`; the default is **off**, and `--no-teach` overrides `%teach` in the grammar; under `ll1` it is ignored with a note. It is independent of `%mermaid`. See [`06-analysis.md`](../06-analysis.md) §5 |
 | `%mermaid` (equivalent to command-line `--mermaid` / `--no-mermaid`) | Generates [Mermaid state machine diagrams](https://mermaid.js.org/): an extra `mermaid/` directory appears in the artifacts (the grammar LR automaton + the lexical DFA); the default is **off**, and `--no-mermaid` overrides `%mermaid` in the grammar; it is unrelated to teaching mode. See [`07-codegen.md`](../07-codegen.md) |
-| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | The artifact language; when it disagrees with the command-line `--lang`, the command line wins, and when both are absent `cpp17` is used. `python` produces the compilation-free `parser.py` / `main.py` (see the `%class` section below), `csharp` produces `Parser.cs` / `Token.cs` / `Program.cs` / `parser.csproj`, `rust` produces the Cargo project `Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`, and `go` produces the Go module `go.mod` + `parser.go` / `token.go` / `main.go` (all three are covered in the `%package` / `%import` / `%class_body` section below); `gram` is the **grammar export target**: it generates no code and only exports the original `.gram` file and the analysis report `RESULT.md` to `--out-dir` (see [`14-languages-and-products.md`](../14-languages-and-products.md#文法导出--lang-gram)) |
+| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | The artifact language; when it disagrees with the command-line `--lang`, the command line wins, and when both are absent `cpp17` is used. `python` produces the compilation-free `parser.py` / `main.py` (see the `%class` section below), `csharp` produces `Parser.cs` / `Token.cs` / `Program.cs` / `parser.csproj`, `rust` produces the Cargo project `Cargo.toml` + `src/parser.rs` / `src/token.rs` / `src/main.rs`, and `go` produces the Go module `go.mod` + `parser.go` / `token.go` / `main.go` (all three are covered in the `%package` / `%import` / `%class_body` section below); `gram` is the **grammar export target**: it generates no code and only exports the original `.gram` file and the analysis report `RESULT.md` to `--out-dir` (see [`13-languages-and-products.md`](../13-languages-and-products.md#文法导出--lang-gram)) |
 | `%namespace NAME` | The namespace name and file name prefix of the C++17 artifacts (command-line `--namespace` takes precedence). NAME matches `[A-Za-z_][A-Za-z0-9_]*`, may not be a C++ keyword, and does not support `::`; when absent, the default `Parser` + unprefixed file names are used |
 | `%prefix NAME` | The public symbol prefix for C99 (command-line `--prefix` takes precedence); it may not start with `Parser` / `PARSER`; it takes effect only for `--lang c`, and for other languages it notes and ignores it |
 | `%class NAME` | The parser class name of the Python artifacts (command-line `--class` takes precedence; defaults to `Parser`). NAME matches `[A-Za-z_][A-Za-z0-9_]*` and may not be a Python keyword; it is valid only for `--lang python`, and pairing it with C / C++17 is a direct error |
@@ -337,7 +337,7 @@ Rules:
 
 Its purpose is multi-instance coexistence: when two generator artifacts are linked together under C++, the namespace and file names no longer
 collide (for details and caveats, see the "Replacing the Namespace and File Name Prefix" section of
-[`14-languages-and-products.md`](../14-languages-and-products.md)). Example:
+[`13-languages-and-products.md`](../13-languages-and-products.md). Example:
 `example/namespace_demo.gram`.
 
 ### `%class`: The Parser Class Name of the Python Artifacts (`--lang python`)
@@ -650,7 +650,7 @@ Rule details:
   `Parser_RunText("a\nb\n", &result)` / `engine.runText("a\nb\n", &result)` /
   `engine.run_text("a\nb\n")`.
 
-For a complete example see `example/space_demo.gram` (paired with [`10-examples.md`](../10-examples.md)).
+For a complete example see `example/space_demo.gram` (paired with [`09-examples.md`](../09-examples.md).
 
 ### Lexer post-processing and placeholder tokens
 
@@ -839,7 +839,7 @@ Grammar-layer parsing rules:
 - The pattern must be a double-quoted literal and is executed by the selected regex engine. A form without metacharacters is a fixed literal.
   C supports DFA and the shared ordered runtime, including lazy matching, assertions and backreferences;
   C++ selects `std`, `dfa` or `vm`. Nullable patterns are rejected. See
-  [regex compatibility](../21-regex-compatibility.md) for native-extension validation limits.
+  [regex compatibility](../20-regex-compatibility.md) for native-extension validation limits.
 - `%commit` matching goes through the **same lexical match order** as `%token` (fixed literals / `%token regex`) and the built-in comment
   rules: longest match first, and for equal length by declaration order (earlier declarations win;
   within the same line, by writing order). **The same pattern cannot be both a token and a `%commit` /
@@ -848,14 +848,14 @@ Grammar-layer parsing rules:
   (the lexical position advances), a `skip` fragment produces no container element, and the remaining fragments are appended in order of appearance.
 - The line number is the 1-based line number of the fragment's **start position**; `text` is the matched original text (including the literal
   itself), and newlines inside a multi-line fragment are kept as-is. The column number / offset is not in a `%commit` element
-  (for the syntax-layer position API see [`08-generated-code.md`](../08-generated-code.md)).
+  (for the syntax-layer position API see [`08-generated-code.md`](../08-generated-code.md).
 - `%commit` is a lexer-layer thing and does not change the grammar (`analysis_*` cannot see it at all);
   `%tree`, LL / LR, and `%mode lex` can all use it.
 - Language coverage: all six backends support it (C99 `Parser_GetCommits()`, C++17 `Engine::commits()`,
   Python `engine.commits`, C# `Commits`, Rust `engine.commits()`,
   Go `engine.Commits()`). For the container's fields and
   ownership details see
-  [`14-languages-and-products.md`](../14-languages-and-products.md).
+  [`13-languages-and-products.md`](../13-languages-and-products.md).
 
 For a complete example see `example/commit_demo.gram`.
 
@@ -889,7 +889,7 @@ The `*` after the group permits zero or more body fragments. Omitting it changes
 language; that is not evidence of a negated-class or DFA construction bug. Empty bodies, ordinary
 text, repeated stars and Chinese text are verified with C DFA, C++ standard regex and the shared
 ordered runtime. Lazy expressions are also supported; C selects the ordered runtime for them.
-See [the compatibility report](../21-regex-compatibility.md) for actual engine selection and guarantees.
+See [the compatibility report](../20-regex-compatibility.md) for actual engine selection and guarantees.
 
 ### How the Four "Places to Write User Code" Are Divided
 
@@ -1106,7 +1106,7 @@ After a fixed literal matches, the lexeme is written into `pToken->pName`, so `%
   silently treating it as "a useless binding".
 - A regex may not match the empty string (all six backends error: no language's lexer could advance); the repetition
   limit of `{m,n}` in the shared compiler is 1000. C and C++ `vm` require shared compilation;
-  native syntax may have different limits. See [compatibility validation](../21-regex-compatibility.md).
+  native syntax may have different limits. See [compatibility validation](../20-regex-compatibility.md).
 - LL(1) direct left recursion is eliminated automatically, while detected indirect left recursion is an error; the unresolved conflicts of SLR/LALR/IELR
   are handled by the `%expect` rules (IELR first tries to split the conflicting states and errors only if it cannot);
 

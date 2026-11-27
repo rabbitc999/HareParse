@@ -2,7 +2,7 @@
 
 <img src="image/gram-editor-256.png" alt="HareParse 解析器生成器图标" width="120" align="right" />
 
-HareParse 从一份 `.gram` 文法生成词法器、解析器和可构建的工程，并附上分析报告。它面向语言前端、
+HareParse 从一份**文法定义文件**（`.gram`）生成词法器、解析器和可构建的工程，并附上分析报告。它面向语言前端、
 配置格式与教学示例：**九种目标语言**、**十六种分析模式**，C++17 与 Rust 另提供增量 API。
 一份文法同时是语法定义与文档——`%token`、`%identifier`、`%trivia` 这些声明就是词法规则，
 产生式里点得出关键字、块与命令，而不是靠一个大正则去"提取词素"。
@@ -22,8 +22,8 @@ make -C build/examples/calc-parser
 Windows 上可执行文件为 `build/bin/HareParse.exe`。默认目标语言是 C++17，默认分析模式是 IELR(1)；
 命令行的 `--lang`、`--mode` 可覆盖文法里的 `%lang`、`%mode`。生成目录中有源码、构建文件和
 `RESULT.md` 分析报告——状态数、冲突、可解析性都在里面（默认是简化版，要末尾那份完整
-报告加 `--full-report`）。`.gram` 写法与全部命令行选项见
-[使用手册](doc/12-grammar-usage.md)。
+报告加 `--full-report`）。文法定义文件的写法与全部命令行选项见
+[使用手册](doc/11-grammar-usage.md)。
 
 ## 支持的目标语言与分析模式
 
@@ -36,11 +36,11 @@ Windows 上可执行文件为 `build/bin/HareParse.exe`。默认目标语言是 
 | `--lang gram` | 导出原文法与分析报告，覆盖全部 16 种模式 |
 
 十六种模式包括 LL、LR、GLR、Earley、CYK、递归下降 DD 和仅生成词法器的 `lex`。各模式的准确支持
-范围、限制和 C++17 / Rust 增量 API 以[支持矩阵](doc/15-language-mode-support.md)为准。
+范围、限制和 C++17 / Rust 增量 API 以[支持矩阵](doc/14-language-mode-support.md)为准。
 
 ## 生成 Lepus 代码
 
-使用 `--lang lepus`（或文法中的 `%lang lepus`），从 `.gram` 直接生成自包含的
+使用 `--lang lepus`（或文法中的 `%lang lepus`），从文法定义文件直接生成自包含的
 `parser.lep` 和 `RESULT.md`，可由 Lepus 编译器运行或构建为原生程序：
 
 ```sh
@@ -54,7 +54,7 @@ lepus build build/examples/lepus-parser/parser.lep --out build/examples/lepus-pa
 生成的解析器提供 `Parser::runText`、`Parser::runTokens` 和语法树结果；
 语义动作及 `%code` / `%main` / `%epilogue` 中须使用 Lepus 代码。
 默认入口从标准输入读取一行，默认语义值为 `float64`。
-完整 API、指令限制与回归命令见 [Lepus 后端](doc/17-lepus-backend.md)，
+完整 API、指令限制与回归命令见 [Lepus 后端](doc/23-lepus-backend.md)，
 LL(1) 示例见 [`lepus_ll1.gram`](example/lepus_ll1.gram)。
 
 ## 实现结构
@@ -64,10 +64,10 @@ LL(1) 示例见 [`lepus_ll1.gram`](example/lepus_ll1.gram)。
 | [`source/`](source/README.md) | 生成器本体：文法读取、各模式前端、代码发射、诊断与报告 |
 | [`source/templates/`](source/templates/) | 各目标语言的产物模板（生成工程时填进去） |
 | [`example/`](example/) | 示例文法与预期产物 |
-| [`vscode/`](vscode/README.md) | `.gram` 的编辑器支持（高亮、补全、诊断） |
+| [`vscode/`](vscode/README.md) | 文法定义文件（`.gram`）的编辑器支持（高亮、补全、诊断） |
 | `library/` | 与生成器并列的通用库（各库各有 README）；`library/transfer` 可把四元式降为目标机代码 |
 
-实现细节见[架构文档](doc/03-architecture.md)，模式与后端的取舍见[支持矩阵](doc/15-language-mode-support.md)。
+实现细节见[架构文档](doc/03-architecture.md)，模式与后端的取舍见[支持矩阵](doc/14-language-mode-support.md)。
 
 ## 构建
 
@@ -105,9 +105,8 @@ python tools/package_compiler.py HareParse   # 打成 HareParse-<平台>.zip
 
 ## 文档与许可
 
-[仓库文档总览](doc/01-overview.md)汇总所有文档；项目故事有[满级文法与一次大扫除](doc/02-gram-legend.md)、
-[一份 .gram，八种语言](doc/04-hareparse-story.md)。协作与生成物维护规则见 [`AGENTS.md`](AGENTS.md)；
-许可证见 [`LICENSE`](LICENSE)（MIT）。
+[仓库文档总览](doc/02-overview.md)汇总所有文档；项目故事见[01 满级文法与一次大扫除](doc/01-gram-legend.md)。
+协作与生成物维护规则见 [`AGENTS.md`](AGENTS.md)；许可证见 [`LICENSE`](LICENSE)（MIT）。
 
 ## 相邻工程（分项目）
 

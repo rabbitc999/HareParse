@@ -1,4 +1,4 @@
-# 08 完整工程示例：从文法到能跑的程序
+# 10 完整工程示例：从文法到能跑的程序
 
 [`project/pl0-ir/`](../project/pl0-ir/) 是一个**完整的 C++17 工程**：用 HareParse
 生成 PL/0 的解析器，再用它把 PL/0 程序编译成**三元式**（triple）或**四元式**
@@ -141,7 +141,7 @@ static std::vector<std::string> g_pl0Names;   /* 名字池（去重） */
   `\(\*([^*]|\*+[^)]+)*\*+\)`）匹配即丢，`%space` 只能配空白字符集、做不到这件事。
   好处是解析器本身（当库调 `Parser_RunText()`）就认识注释，不用调用方先预剥文本；
   `(* … *)` 那条特意避开 `\*+[^*)]` 这种写法（会生成永不接受的 DFA，见
-  [`docs/09`](12-grammar-usage.md#commit把识别但不进语法层的文本收进容器) 与
+  [`docs/09`](11-grammar-usage.md#commit把识别但不进语法层的文本收进容器) 与
   `pl0-ir/README.md`）。注释没闭合仍由 `%main` 里**只读**的 `Pl0_CheckComments()`
   报成 `注释没有闭合（{ 少一个 }）`。
 

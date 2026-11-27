@@ -1,4 +1,4 @@
-# 显示语言、内嵌资产与发布
+# 15 显示语言、内嵌资产与发布
 
 HareParse 命令行支持中文和英文。代码生成目标仍由 `--lang cpp17` 等选项控制；显示语言使用独立的 `--ui-lang`。
 
@@ -20,19 +20,19 @@ HareParse example/calc.gram --lang cpp17 --out-dir build/calc --ui-lang en
 
 ```sh
 HareParse man                     # 目录：内嵌文档 + 指令 / 模式 / 语言 / 示例清单
-HareParse man 12-grammar-usage    # 看某一页（`man 12`、`man %token` 也行）
+HareParse man 11-grammar-usage    # 看某一页（`man 11`、`man %token` 也行）
 HareParse man directives          # 全部 %指令（含每条的一句话说明）
 HareParse man modes               # 16 种生成模式：用法 + 一句话说明
 HareParse man languages           # 目标语言与各自支持的模式数
 HareParse man examples            # example/ 里的示例文法一览
 HareParse man --search 展望符      # 全文搜关键词（页正文 / 指令 / 模式 / 语言）
 HareParse man --json              # 机器可读（编辑器 / 脚本用）
-HareParse man --lang en 04        # 正文语言：zh / en / auto（缺省自动检测）
+HareParse man --lang en 12        # 正文语言：zh / en / auto（缺省自动检测）
 ```
 
 | 要点 | 说明 |
 | --- | --- |
-| 数据来源 | `doc/*.md` + `doc/en/*.md` + `example/manifest.tsv`；**不含** `09-build-and-test.md` 与 `09-extra.md`（那两页是仓库自己的构建与实验记录，不该随安装在别处的编译器一起发出去） |
+| 数据来源 | `doc/*.md` + `doc/en/*.md` + `example/manifest.tsv`；**不含** `04-build-and-test.md`（那是仓库自己的构建与测试记录，不该随安装在别处的编译器一起发出去） |
 | 重新内联 | 改完 `doc/` 后跑 `make -C source manual`（等价 `python tools/embed_manual.py`），再编译 |
 | 体积 | 约 1.3 MB Markdown 用 `library/lztext` 压到约 0.4 MB（比率 ≈ 0.29），生成 2 MB 量级的 C++ 字节数组 |
 | 中英对照 | 有英文版的页在目录里标 `[en]`，页脚写 `来源：doc/<名字>` / `英文版：doc/en/<名字>`；`--lang en` 或有英文版且区域是英文时取英文正文 |
@@ -58,7 +58,7 @@ HareParse lsp --version            # hareparse-lsp 1.0.0
 | 校验文法 | `HareParse lsp --check FILE`；诊断按 `error` / `warning` / `info` 映射到问题面板的三档 |
 | 自带编译器 | 打包时 `vscode/tools/embed-compiler.js` 把 `HareParse[.exe]` 拷进 `vscode/bin/`（内容一致就跳过；`vscode/bin/` 不入库） |
 | 平台标记 | `vscode/tools/package.js` 给 `.vsix` 的 `Identity` 写 `TargetPlatform`（如 `win32-x64`）并把同样的后缀缀进文件名；`--universal` 可以产出不带标记的通用包 |
-| 打开手册 | `Gram: 打开文法指令手册` 优先打开仓库里的 `doc/12-grammar-usage.md`；仓库不在旁边时改用 `HareParse man 12-grammar-usage`，把同一份正文显示在编辑器里 |
+| 打开手册 | `Gram: 打开文法指令手册` 优先打开仓库里的 `doc/11-grammar-usage.md`；仓库不在旁边时改用 `HareParse man 11-grammar-usage`，把同一份正文显示在编辑器里 |
 
 插件自身的目录、命令与打包细节见 [`vscode/README.md`](../vscode/README.md)。
 

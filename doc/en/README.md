@@ -1,13 +1,13 @@
 # Repository Documentation
 
-The [Lepus backend reference](../17-lepus-backend.md) describes native `.lep` output,
+The [Lepus backend reference](../23-lepus-backend.md) describes native `.lep` output,
 LL(1), SLR(1), LALR(1), LR(1), IELR(1), APIs and current limitations.
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../../doc/README.md)。
 
 > **Lepus's glorious history**: This language grew up in this repository in its early days — the generator, StackVM, standard library, glue and reflection were all polished together here (the Lepus documents below are the record of that era). It has since been split into an independent repository at <https://github.com/rabbitc999/Lepus>; links to `lepus/` in this document now point to the corresponding documents in the new repository.
 
-HareParse's [tri-language display, embedded assets and release notes](../16-i18n-and-packaging.md) cover `--ui-lang`, the `man` and `lsp` subcommands, the console and pipes, and the standalone packaging scripts for the two tools.
+HareParse's [tri-language display, embedded assets and release notes](../15-i18n-and-packaging.md) cover `--ui-lang`, the `man` and `lsp` subcommands, the console and pipes, and the standalone packaging scripts for the two tools.
 
 For the Lepus 1.0.0 name, the `.lep` project layout and the Chinese/English/Japanese language selection, see [Lepus naming and tri-language notes](https://github.com/rabbitc999/Lepus/blob/master/doc/37-name-freeze.md).
 Lepus's [documentation index](https://github.com/rabbitc999/Lepus/blob/master/doc/README.md) walks through things step by step with official example source, expected output and error boundaries. Beginners start from [08 first programs](https://github.com/rabbitc999/Lepus/blob/master/doc/01-quickstart.md); specialized environments and acceptance scope are in [28 sample verification](https://github.com/rabbitc999/Lepus/blob/master/doc/11-algorithm-validation.md).
@@ -19,34 +19,36 @@ For the `T &` default read-only reference, see [reference syntax sugar](https://
 
 For cross-feature combinations of references with generics, enums, callbacks, iterators, interfaces and Drop, see [reference_combinations.lep](https://github.com/rabbitc999/Lepus/blob/master/example/samples/reference_combinations.lep); the dedicated regression is `tests/lepus_reference_combinations.py`, covering normal interpretation / AOT and illegal-escape diagnostics.
 
-Start from [01 repository documentation overview](../01-overview.md). This directory is the **sole entry point for all repository documentation**: repository-wide navigation, cross-project notes, and the manual and implementation documents of the HareParse parser generator all live here.
+Start from [02 repository documentation overview](../02-overview.md). This directory is the **sole entry point for all repository documentation**: repository-wide navigation, cross-project notes, and the manual and implementation documents of the HareParse parser generator all live here.
 
 | Document | Content |
 | --- | --- |
-| [01 Repository Documentation Overview](../01-overview.md) | Entry point to all projects, additional libraries and all documents |
-| [02 Max-Level Grammar](../02-gram-legend.md) | A fictional side story spanning the parser, Lepus and course experiments, continuing Lepus 1.0, iteration chains and multi-database acceptance |
+| [02 Repository Documentation Overview](../02-overview.md) | Entry point to all projects, additional libraries and all documents |
+| [01 Max-Level Grammar](../01-gram-legend.md) | A fictional side story spanning the parser, Lepus and course experiments, continuing Lepus 1.0, iteration chains and multi-database acceptance |
 | [03 Architecture](../03-architecture.md) | Modules, data flow and code conventions of the generator |
-| [04 One .gram, Eight Languages](../04-hareparse-story.md) | The evolution story of the HareParse generator |
-| [05 Grammar](../05-grammar.md) | The `.gram` syntax specification and generation-time validation |
+| [04 Build and Test](../04-build-and-test.md) | Generator build, template rebuild and regression |
+| [05 Grammar](../05-grammar.md) | The grammar definition file (`.gram`) specification and generation-time validation |
 | [06 Analysis](../06-analysis.md) | Algorithms such as LL, LR and IELR |
 | [07 Code Generation](../07-codegen.md) | Template system and language backends |
 | [08 Generated Code](../08-generated-code.md) | Inventory of output artifacts and APIs |
-| [09 Build and Test](../09-build-and-test.md) | Generator build, template rebuild and regression |
-| [09 Sealed Side Story](../09-extra.md) | Paragraphs removed from 02, sealed as "grammar is the key"; speak the seal phrase and the repository's parser generator unseals it |
-| [10 Example Grammars](../10-examples.md) | A guided tour of `example/` |
-| [11 Project Examples](../11-project-examples.md) | A guided tour of `project/` |
-| [12 Grammar Usage Manual](../12-grammar-usage.md) | Directives, semantic actions and error recovery |
-| [13 Generation Modes](../13-modes.md) | Sixteen generation modes and the runtimes |
-| [14 Target Languages and Output Artifacts](../14-languages-and-products.md) | Backend selection and artifact forms |
-| [15 Support Matrix](../15-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
-| [16 Tri-language, Embedded Assets and Release](../16-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+| [09 Example Grammars](../09-examples.md) | A guided tour of `example/` |
+| [10 Project Examples](../10-project-examples.md) | A guided tour of `project/` |
+| [11 Grammar Usage Manual](../11-grammar-usage.md) | Directives, semantic actions and error recovery |
+| [12 Generation Modes](../12-modes.md) | Sixteen generation modes and the runtimes |
+| [13 Target Languages and Output Artifacts](../13-languages-and-products.md) | Backend selection and artifact forms |
+| [14 Support Matrix](../14-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
+| [15 Tri-language, Embedded Assets and Release](../15-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+| [16 Extended Regular Expressions](../16-regex-extensions.md) | Lookahead, word boundaries, case-insensitive matching, backreferences and the C99 ordered-match runtime |
+| [17 Unicode Regex Modes](../17-regex-unicode.md) | UTF-8 code points, Unicode 17.0 properties, word boundaries and simple case folding |
+| [18 Custom Error Messages](../18-custom-error-messages.md) | Error-message callbacks, context and default-message restoration across all eight languages |
+| [19 Regex Runtime Budgets](../19-regex-runtime-budgets.md) | Steps, working memory, backtracking, lookahead, cancellation and structured failure states |
+| [20 Regex Compatibility and Check-Only Validation](../20-regex-compatibility.md) | Per-rule engines, semantic guarantees, strict mode and validation that writes no output |
+| [21 Incremental Binary Generation](../21-incremental-generation.md) | Analysis caches, semantic refresh, invalidation, corrupt-cache recovery and the C++11 subset regression |
+| [22 VS Code Workflow](../22-vscode-workflow.md) | Large-grammar sync, cancellation, incremental generation settings, workspace references and safe rename |
+| [23 Lepus Backend](../23-lepus-backend.md) | How Lepus output is generated, its API and regressions |
 | [Lepus EBNF Grammar Reference](https://github.com/rabbitc999/Lepus/blob/master/doc/14-grammar-ebnf.md) | Current lexical specification, all productions, anonymous function types, generic entry points and semantic-check boundaries |
 | [Lepus Language Philosophy](https://github.com/rabbitc999/Lepus/blob/master/doc/03-core-concepts.md) | Write simply, run everywhere; value semantics, explicit references, resource management and no move semantics |
 | [Documentation Maintenance Guidelines](../../project/document/README.md) | Unified conventions, technical document templates, documentation generator and sync checks |
-
-> The `09` pages (build and test, sealed side story) have no English edition yet; the entries above
-> link to the Chinese originals. Pages without an English edition are always linked to their Chinese
-> source rather than to a partial translation.
 
 ## mc Connecting to External Databases
 
@@ -154,10 +156,10 @@ Lepus's lambda and function-pointer callbacks support iterator chains and callba
 
 Lepus recursion and nested ownership: local aggregates, reference slots, arrays, function values and interface combinations; the [calculator tool-chain example](https://github.com/rabbitc999/Lepus/blob/master/example/calculator/README.md) includes both flat and nested ASTs.
 
-[Custom error messages for all eight targets](../19-custom-error-messages.md) and [regex runtime budgets](../20-regex-runtime-budgets.md) (Chinese).
+[Custom error messages for all eight targets](../18-custom-error-messages.md) and [regex runtime budgets](../19-regex-runtime-budgets.md) (Chinese).
 
-[Regex compatibility reports and validation without writing output](../21-regex-compatibility.md) (Chinese).
+[Regex compatibility reports and validation without writing output](../20-regex-compatibility.md) (Chinese).
 
-[Binary incremental generation and C++11 subset tests](../22-incremental-generation.md) (Chinese).
+[Binary incremental generation and C++11 subset tests](../21-incremental-generation.md) (Chinese).
 
-[VS Code large-grammar editing, incremental generation and workspace rename](../23-vscode-workflow.md) (Chinese).
+[VS Code large-grammar editing, incremental generation and workspace rename](../22-vscode-workflow.md) (Chinese).

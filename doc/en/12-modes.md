@@ -1,13 +1,13 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# 10 Generation Modes and Runtimes (User Manual)
+# 12 Generation Modes and Runtimes (User Manual)
 
 This chapter was split out of [`README.md`](../../README.md): the 16 generation modes (LL family / LR family / GLR / Earley / CYK /
 recursive descent `dd` / `lex`), teaching mode, the Mermaid state-machine diagrams and the lexical match order.
 
 For each mode's formal definition, automaton construction and conflict handling see [`06-analysis.md`](../06-analysis.md);
+for the API on the artifact side see [`08-generated-code.md`](../08-generated-code.md);
 for the API on the artifact side see [`08-generated-code.md`](../08-generated-code.md).
-For the language-by-language mode and incremental support scope see [12 Modes Supported by Each Language and the Incremental API](../15-language-mode-support.md).
 
 ## LR(0) / LR(1) Canonical Automaton Modes
 
@@ -81,10 +81,10 @@ no parse table / parse stack / `run_text`, C#'s `Parser.cs` has
 no parse table / parse stack / `runText`, and Go's `parser.go` has
 no parse table / parse stack / `RunText` (only `Tokenize`).
 
-`--lang gram` ([grammar export mode](../14-languages-and-products.md#文法导出--lang-gram)) also accepts
+`--lang gram` ([grammar export mode](../13-languages-and-products.md#文法导出--lang-gram)) also accepts
+`--lang gram` ([grammar export mode](../13-languages-and-products.md#文法导出--lang-gram)) also accepts
 `--mode lex`, but that profile does not even generate a lexer: the artifact is the original `.gram` file + `RESULT.md`,
 and the report lists a lexical section and the token table (fixed literals / `%token regex` / `%identifier`).
-
 ```sh
 # C 产物
 ./build/bin/HareParse --grammar-file example/lexer_only.gram \
@@ -189,8 +189,7 @@ A few conventions:
      number of states saved by core merging;
    - `ielr`: the number of states before and after splitting, the number of state splits, `IELR 表未消解冲突数`;
 3. It also changes `slr` / `lalr` / `ielr` to "report but do not abort": without `%teach` these three
-   modes are strict, and an unresolved conflict is an immediate error that produces no code (see [Conflict Handling and Precedence](../12-grammar-usage.md#冲突处理与优先级)).
-
+   modes are strict, and an unresolved conflict is an immediate error that produces no code (see [Conflict Handling and Precedence](../11-grammar-usage.md#冲突处理与优先级).
 Under `ll1` (where there are no conflicts to talk about) `%teach` is ignored, with a note on the terminal. Teaching mode is only a
 report-layer switch and does not change the artifact content; diagramming the automata is another switch, see [State Machine Diagrams (Mermaid)](#state-machine-diagrams-mermaid).
 
@@ -412,7 +411,7 @@ rather than picking one by precedence /
   parse, and this policy provides no transactional or exactly-once guarantee.
   In tree mode, what is locally reused is the packed forest's shared symbol nodes and reduction candidates, while the public `Tree`
   is still re-materialized. GSS checkpoint recovery, in-place CST patching and continuation of error-recovery state are not yet implemented.
-  For new cache fields and metric definitions see [the Forest patching interface in 12](../15-language-mode-support.md#forest-修补接口).
+  For new cache fields and metric definitions see [the Forest patching interface in 12](../14-language-mode-support.md#forest-修补接口).
 
 ## Earley and CYK Chart Parsing
 
@@ -436,7 +435,7 @@ unit rules, long right-hand sides and left recursion; for the English ambiguity 
 
 The C++17 / Rust artifacts of Earley/CYK also expose GLR's experimental incremental entry points, with the same limitations as GLR:
 after the input changes they still rebuild the decision chart and GSS, but locally patch the shared forest; local chart updates are not yet implemented.
-For the complete support matrix see [12](../15-language-mode-support.md).
+For the complete support matrix see [14](../14-language-mode-support.md).
 
 ## Recursive Descent (`%mode dd`)
 

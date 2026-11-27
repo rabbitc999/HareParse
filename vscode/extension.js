@@ -652,8 +652,8 @@ async function previewActiveGrammar() {
 /**
  * 命令：打开文法指令手册。
  *
- * 在仓库里就直接开 `doc/12-grammar-usage.md`（能编辑、能搜）；装成 `.vsix` 单独用时
- * 没有仓库，就退回编译器里的内嵌手册（`HareParse man 12-grammar-usage`），
+ * 在仓库里就直接开 `doc/07-grammar-usage.md`（能编辑、能搜）；装成 `.vsix` 单独用时
+ * 没有仓库，就退回编译器里的内嵌手册（`HareParse man 07-grammar-usage`），
  * 放到一个只读的虚拟文档里看。
  */
 async function openGrammarDoc() {
@@ -661,7 +661,7 @@ async function openGrammarDoc() {
 
   // 1. 仓库里的 Markdown 优先。
   if (resolved.repoRoot) {
-    const docPath = path.join(resolved.repoRoot, 'doc', '12-grammar-usage.md');
+    const docPath = path.join(resolved.repoRoot, 'doc', '07-grammar-usage.md');
     if (fs.existsSync(docPath)) {
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(docPath));
       await vscode.window.showTextDocument(doc, { preview: true });
@@ -678,7 +678,7 @@ async function openGrammarDoc() {
   }
   const result = await engine.runProcess(
     resolved.hareParse,
-    ['man', '12-grammar-usage', '--lang', manualLanguage()],
+    ['man', '07-grammar-usage', '--lang', manualLanguage()],
     { timeoutMs: 30000 },
   );
   if (result.code !== 0) {

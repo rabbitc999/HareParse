@@ -1,6 +1,6 @@
-# 03 文法分析：LL(1) / SLR(1) / LALR(1) / IELR(1)
+# 06 文法分析：LL(1) / SLR(1) / LALR(1) / IELR(1)
 
-本章说明分析算法；后端模式支持与增量运行时能力统一见 [12 支持矩阵](15-language-mode-support.md)。
+本章说明分析算法；后端模式支持与增量运行时能力统一见 [14 支持矩阵](14-language-mode-support.md)。
 
 ## 1. 文件拆分
 

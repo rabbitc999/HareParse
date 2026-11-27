@@ -1,11 +1,11 @@
-# 12 各语言支持的模式与增量 API
+# 14 各语言支持的模式与增量 API
 
 本章统一记录当前版本的支持范围。九种代码生成目标为 C99、C++17、Python、C#、Rust、Go、Java、JavaScript/TypeScript、Lepus；
 `gram` 是文法与分析报告导出档，不是编程语言目标。默认目标为 `cpp17`，默认模式为 `ielr`。
 命令行 `--lang` / `--mode` 覆盖文法中的 `%lang` / `%mode`。
 
-模式的算法、适用场景和限制见 [10 生成模式与运行时](13-modes.md)，
-产物与调用方式见 [11 目标语言、产物与 API](14-languages-and-products.md)。
+模式的算法、适用场景和限制见 [12 生成模式与运行时](12-modes.md)，
+产物与调用方式见 [13 目标语言、产物与 API](13-languages-and-products.md)。
 
 ## 生成支持矩阵
 
@@ -135,6 +135,6 @@ Java 22 编译运行通过，Node.js 26 对 `parser.ts` 做语法检查并直接
 语言限制见 [`source/src/project.cpp`](../source/src/project.cpp) 的 `Project::generateParserProject`；
 模式分类见 [`source/src/analysis.cpp`](../source/src/analysis.cpp)。
 增量实现位于 [`source/templates/`](../source/templates/) 的 C++17 与 Rust 运行时模板。
-专项回归入口见 [06 构建、模板与小测](09-build-and-test.md)。
+专项回归入口见 [04 构建、模板与小测](04-build-and-test.md)。
 
-Lepus 支持全部 16 种生成模式，生成自包含 `parser.lep`，支持原生语义动作与 Token API；指令边界见 [Lepus 后端](17-lepus-backend.md)。
+Lepus 支持全部 16 种生成模式，生成自包含 `parser.lep`，支持原生语义动作与 Token API；指令边界见 [Lepus 后端](23-lepus-backend.md)。

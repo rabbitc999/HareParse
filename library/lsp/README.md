@@ -21,7 +21,7 @@
 | 能力 | 说明 |
 | --- | --- |
 | 诊断 | 未知指令、禁用的旧用户代码块、未知 `%mode` / `%lang` 取值、`%start` 指向不存在的产生式、`%sync` 用未声明 Token、未声明的非终结符、未使用的 Token（规则里没用到且不是 `%prec` 来源）、未闭合的注释 / 字符串 / 段标记 / 语义动作、隐式 Token 提示 |
-| 悬停 | 全部 `%指令` 的中文说明（与 `../../doc/12-grammar-usage.md` 的指令表一致）、Token 的字面量 / 正则 / `%union` 成员 / CSV 别名来源（`%token NAME include "表.csv"`）/ `alias` 显示名、`%token` 的两个行内关键字 `include` 与 `alias`、非终结符的候选数与起始符号标记、`$n` / `$$` / `$line` / `$token` / `$code` |
+| 悬停 | 全部 `%指令` 的中文说明（与 `../../doc/11-grammar-usage.md` 的指令表一致）、Token 的字面量 / 正则 / `%union` 成员 / CSV 别名来源（`%token NAME include "表.csv"`）/ `alias` 显示名、`%token` 的两个行内关键字 `include` 与 `alias`、非终结符的候选数与起始符号标记、`$n` / `$$` / `$line` / `$token` / `$code` |
 | 补全 | 行首补 `%指令`；`%mode` / `%lang` 后补取值；`%token NAME ` 后补 `include`（CSV 别名表）与 `alias`（显示名）；规则区补 Token、非终结符、`%empty`、`%prec` |
 | 跳转定义 | Token / 非终结符引用 → `%token` / `%define` / 规则左部的声明处（`%prec` 的参数也能跳） |
 | 文档大纲 | `%指令`、Token（带 `include "表.csv"` / `alias "显示名"` 详情）、产生式（含候选数与"起始符号"标记） |

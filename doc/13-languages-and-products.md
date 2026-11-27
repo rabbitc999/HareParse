@@ -1,4 +1,4 @@
-# 11 目标语言、产物与 API（用户手册）
+# 13 目标语言、产物与 API（用户手册）
 
 本章从 [`README.md`](../README.md) 拆出：九种目标语言（C99 / C++17 / Python / C# / Rust / Go / Java / JS-TS / Lepus）与
 「只要文法与分析报告」的导出档 `--lang gram` 的选择与
@@ -6,8 +6,8 @@
 与内存管理。
 
 语言后端的实现与模板见 [`07-codegen.md`](07-codegen.md)，各档产物的 API 细节见
-[`08-generated-code.md`](08-generated-code.md)，词法模式的产物见 [`13-modes.md`](13-modes.md)。
-各语言可用模式及增量 API 的统一矩阵见 [12 各语言支持的模式](15-language-mode-support.md)。
+[`08-generated-code.md`](08-generated-code.md)，词法模式的产物见 [`12-modes.md`](12-modes.md)。
+各语言可用模式及增量 API 的统一矩阵见 [14 各语言支持的模式](14-language-mode-support.md)。
 
 ## 目标语言（C99 / C++17 / Python / C# / Rust / Go / Java / JS-TS / Lepus）
 
@@ -66,7 +66,7 @@ C++17 产物**不是**把 C 产物塞进 `.cpp`，而是另一套模板（`sourc
 DD 按产生式声明顺序回溯，Earley 执行预测、扫描、完成并保留第一棵派生树；CYK
 使用 CNF 跨度表判定，再按原文法恢复第一棵派生树。当前不支持
 语义动作、`%value_type` / `%union`、`%sync`、`%commit`、`%copy` 或用户代码段；其他模式
-会在生成阶段明确拒绝，完整边界见 [支持矩阵](15-language-mode-support.md)。
+会在生成阶段明确拒绝，完整边界见 [支持矩阵](14-language-mode-support.md)。
 
 C / C++17 / Python 三档的**语义**一致：同一份文法、同一份输入，输出（含错误消息
 文本）逐字相同（C# 在 Windows 上是平台 CRLF 行尾，
@@ -169,7 +169,7 @@ CRLF 行尾）：
 同一个模式不能既当 `%token` 又当 `%commit` / `%trivia`（`%trivia` 与
 `%commit skip` 等价，两种写法生成的词法表逐字相同）；匹配与 `%token` /
 内建注释规则共用一份最长匹配顺序（同长度按声明先后）。用法与完整例子见
-[`05-grammar.md`](05-grammar.md) 与 [`12-grammar-usage.md`](12-grammar-usage.md)，
+[`05-grammar.md`](05-grammar.md) 与 [`11-grammar-usage.md`](11-grammar-usage.md)，
 生成的 API 细节见 [`08-generated-code.md`](08-generated-code.md)。
 
 Token 和 commit 类型还支持可选显示别名：
@@ -422,7 +422,7 @@ void main() {
 `%class_body`、`%package`、`%import` 和 `%copy`。
 LL(1) 暂不支持自动左递归改写后的语义动作，须直接提供 LL(1) 文法。
 
-完整边界与回归命令见 [Lepus 后端](17-lepus-backend.md)；可运行示例见
+完整边界与回归命令见 [Lepus 后端](23-lepus-backend.md)；可运行示例见
 [`lepus_ll1.gram`](../example/lepus_ll1.gram) 和 [`lepus_lr1.gram`](../example/lepus_lr1.gram)。
 
 ### 文法导出（`--lang gram`）
@@ -441,8 +441,8 @@ head -n 30 out/pl0.analysis.md  # 冲突消解 / 未消解冲突 / 分析报告
 | | 文法导出档（`--lang gram`） |
 | --- | --- |
 | 文件 | `<原文件名>.gram`（没给文件时 `grammar.gram`）/ `<文法名>.analysis.md` / `RESULT.md` / `%copy` 的文件 |
-| 模式 | 16 种模式均可导出；`glr` / `earley` / `cyk` 只导出文法与对应分析报告，不生成运行时。`--mode lex` 报告为词法一节 + Token 表，详见 [支持矩阵](15-language-mode-support.md) |
-| 绘图 | `gram` 不生成 Python 运行时或 `--svg` / `--dot` 演示程序；Python 产物的绘图另见 [`10`](13-modes.md) |
+| 模式 | 16 种模式均可导出；`glr` / `earley` / `cyk` 只导出文法与对应分析报告，不生成运行时。`--mode lex` 报告为词法一节 + Token 表，详见 [支持矩阵](14-language-mode-support.md) |
+| 绘图 | `gram` 不生成 Python 运行时或 `--svg` / `--dot` 演示程序；Python 产物的绘图另见 [`10`](12-modes.md) |
 | 报告 | 分析报告单独成文件、和 `.gram` 成对（`pl0.gram` ↔ `pl0.analysis.md`），正文与 `--report FILE` 写出来的是同一份 |
 | 不适用指令 | `%namespace` / `%class` / `%package` / `%import` / `%class_body` / `%destructor` / `%cpp_only` 全部提示一句并忽略 |
 
@@ -496,7 +496,7 @@ head -n 30 out/pl0.analysis.md  # 冲突消解 / 未消解冲突 / 分析报告
 | `Makefile` | 构建脚本：`make` 出 `libparser.a` + `parser_demo`，另有 `lib` / `demo` / `run` / `clean` |
 | `CMakeLists.txt` | CMake 构建脚本（与 `Makefile` 等价）：`cmake -S . -B build && cmake --build build` |
 | `RESULT.md` | 生成信息、产物清单、编译运行说明、冲突消解与未消解冲突（分析报告全文要加 `--full-report`，见 [`08-generated-code.md`](08-generated-code.md#17-resultmd默认简化版)） |
-| `mermaid/*` | 状态机图示：`index.html` / `grammar.html` / `lexer.html` 与 `.mmd` 源码；**只在开了 `%mermaid` / `--mermaid` 时生成**（与教学模式无关），见[状态机图示](13-modes.md#状态机图示mermaid) |
+| `mermaid/*` | 状态机图示：`index.html` / `grammar.html` / `lexer.html` 与 `.mmd` 源码；**只在开了 `%mermaid` / `--mermaid` 时生成**（与教学模式无关），见[状态机图示](12-modes.md#状态机图示mermaid) |
 
 ### 模板（`source/templates/`）
 

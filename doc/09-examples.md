@@ -1,6 +1,6 @@
-# 07 示例导读
+# 09 示例导读
 
-示例的目标语言由 manifest 与文法约束决定；完整模式支持范围见 [12 支持矩阵](15-language-mode-support.md)。
+示例的目标语言由 manifest 与文法约束决定；完整模式支持范围见 [14 支持矩阵](14-language-mode-support.md)。
 
 `example/` 下共 46 个文法，逐个生成 + 编译一遍就能挡住大部分回归——`make -C source test-smoke` 会按
 [`example/manifest.tsv`](../example/manifest.tsv) 自动跑这一遍（对不上
@@ -43,7 +43,7 @@ Earley / CYK 也覆盖 Go；其余语言限制与固定输入以 manifest 为准
 | `ielr_demo.gram` | IELR | `%value_type int` | 经典非 LALR 文法（def/param_spec/return_spec），演示 IELR 状态拆分 |
 | `ielr_split.gram` | IELR | `%value_type int` | 非 LALR 文法，需要两个独立拆分 |
 | `lrk_demo.gram` | （不写 `%mode`） | `%tree` | LR(k) / LALR(k) 对照：对任何 k 都不是 LALR(k) 的经典例子 |
-| `c89_subset.gram` | LALR | 兜底 `int` | C89 子集，`%tree`，规模最大的示例；见 [Lepus 复测结果](17-lepus-backend.md#c89-子集验证) |
+| `c89_subset.gram` | LALR | 兜底 `int` | C89 子集，`%tree`，规模最大的示例；见 [Lepus 复测结果](23-lepus-backend.md#c89-子集验证) |
 
 ## 4. 词法与文本容器
 
@@ -92,7 +92,7 @@ Earley / CYK 也覆盖 Go；其余语言限制与固定输入以 manifest 为准
 `dd_expr.gram` 的产生式书写顺序就是尝试顺序（`LPAREN expr RPAREN` → `NUMBER PLUS expr`
 → `NUMBER`），喂 `1 + 2` 得到 `NUMBER(1) PLUS(+) expr(NUMBER(2))` 的右结合树；
 左递归文法（`calc.gram` 那种）在生成期就会被拦下并给出改写建议。
-用法与限制见 [`13-modes.md`](13-modes.md) 的「递归下降（`%mode dd`）」。
+用法与限制见 [`12-modes.md`](12-modes.md) 的「递归下降（`%mode dd`）」。
 
 ## 8. 用户代码、入口与目标语言
 
@@ -275,7 +275,7 @@ printf "/* c1 */ 1+2 0x1F @tag #tag // c2" | ./parser_demo
 3. `./build/bin/HareParse --grammar-file example/<名字>.gram --out-dir /tmp/<名字>` 试生成；
 4. 在 [`example/manifest.tsv`](../example/manifest.tsv) 加一行
    `名字<TAB>实测支持的档<TAB>固定输入`，并跑一次
-   `tools/smoke.sh capture`（**脚本目前是桩**，得先让它放行；或按 [`09-build-and-test.md`](09-build-and-test.md) §4
+   `tools/smoke.sh capture`（**脚本目前是桩**，得先让它放行；或按 [`04-build-and-test.md`](04-build-and-test.md) §4
    手工生成 + 编译 + 喂输入）生成 `example/<名字>.expected`；
 5. `make -C source test-smoke` 应当变绿（**脚本目前是桩**，放行前按 §4 的手工姿势验），
    `example/` 下漏写 manifest 的 `.gram` 会报 FAIL。

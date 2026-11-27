@@ -1,6 +1,6 @@
-# 06 构建、模板与小测
+# 04 构建、模板与小测
 
-生成目标与模式范围见 [12 支持矩阵](15-language-mode-support.md)。这里的增量构建
+生成目标与模式范围见 [14 支持矩阵](14-language-mode-support.md)。这里的增量构建
 （Make/CMake/Cargo）与生成解析器的增量解析 API 是不同概念。
 
 ## 统一回归入口
@@ -327,7 +327,7 @@ done
 几档用运行时常量），
 只测一种后端容易漏。
 
-另外用 `--lang gram`（[文法导出档](14-languages-and-products.md#文法导出--lang-gram)）
+另外用 `--lang gram`（[文法导出档](13-languages-and-products.md#文法导出--lang-gram)）
 把同一批文法的原文件 + 分析报告导一遍：它不该生成任何代码（产物只有
 `<原文件名>.gram` / `<文法名>.analysis.md` / `RESULT.md`），且导出的 `.gram`
 应当与输入**逐字节相同**（`cmp 原文件 产物目录/<原文件名>.gram`）、

@@ -1,6 +1,6 @@
-# 01 总体架构
+# 03 总体架构
 
-语言与模式的组合限制、增量 API 范围统一见 [12 支持矩阵](15-language-mode-support.md)。
+语言与模式的组合限制、增量 API 范围统一见 [14 支持矩阵](14-language-mode-support.md)。
 
 ## 1. 流水线
 
@@ -76,7 +76,7 @@ flowchart TB
 | `source/include/HareParse/` | 数据模型与公开接口 |
 | `` | 生成器的专题文档 |
 
-仓库中其他工程与附加库的归属见[仓库总览](01-overview.md)。
+仓库中其他工程与附加库的归属见[仓库总览](02-overview.md)。
 
 ## 3. 模块职责
 

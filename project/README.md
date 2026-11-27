@@ -91,7 +91,7 @@ project/<名字>/
 2. 抄一份 `Makefile` / `check.sh` / `.gitignore`（改 `GRAMMAR`、`GEN_DIR` 与
    `PYTHON` 之类的变量即可），样例放 `samples/`、期望输出放 `expected/`；
 3. 跑 `make -C project/<名字> check`，全绿之后再补 `README.md`；
-4. 回到本文件与 [`../../doc/11-project-examples.md`](../doc/11-project-examples.md) 的表格里加一行，
+4. 回到本文件与 [`../../doc/10-project-examples.md`](../doc/10-project-examples.md) 的表格里加一行，
    仓库根 `README.md` 的目录结构里也加上——不然别人翻不到。
 
 写工程时最常踩的几类坑（都在这些工程里踩过并写在各自 README 里）：

@@ -1,4 +1,4 @@
-# 01 Repository Documentation Overview
+# 02 Repository Documentation Overview
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../../doc/README.md)。
 
@@ -24,18 +24,26 @@ The generator's implementation and manual live in this directory alongside the r
 | No. | Document | Content |
 | --- | --- | --- |
 | 03 | [Architecture](../03-architecture.md) | Modules and data flow of the generator |
+| 04 | [Build and Test](../04-build-and-test.md) | Generator build, template rebuild and regression |
 | 05 | [Grammar](../05-grammar.md) | The `.gram` specification and validation |
 | 06 | [Analysis](../06-analysis.md) | Algorithms such as LL, LR and IELR |
 | 07 | [Code Generation](../07-codegen.md) | Templates and language backends |
 | 08 | [Generated Code](../08-generated-code.md) | Artifact structure and APIs |
-| 09 | [Build and Test](../09-build-and-test.md) | Generator build, template rebuild and regression |
-| 10 | [Example Grammars](../10-examples.md) | A guided tour of the `example/` grammars |
-| 11 | [Project Examples](../11-project-examples.md) | A guided tour of the `project/` projects |
-| 12 | [Grammar Usage Manual](../12-grammar-usage.md) | Directives and semantic actions |
-| 13 | [Generation Modes](../13-modes.md) | Sixteen analysis and generation modes |
-| 14 | [Target Languages and Output Artifacts](../14-languages-and-products.md) | Backend selection and artifact forms |
-| 15 | [Support Matrix](../15-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
-| 16 | [Tri-language, Embedded Assets and Release](../16-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+| 09 | [Example Grammars](../09-examples.md) | A guided tour of the `example/` grammars |
+| 10 | [Project Examples](../10-project-examples.md) | A guided tour of the `project/` projects |
+| 11 | [Grammar Usage Manual](../11-grammar-usage.md) | Directives and semantic actions |
+| 12 | [Generation Modes](../12-modes.md) | Sixteen analysis and generation modes |
+| 13 | [Target Languages and Output Artifacts](../13-languages-and-products.md) | Backend selection and artifact forms |
+| 14 | [Support Matrix](../14-language-mode-support.md) | Current scope of languages, modes and incremental APIs |
+| 15 | [Tri-language, Embedded Assets and Release](../15-i18n-and-packaging.md) | Display options, embedded manual and language server, Unicode console, standalone Python packaging scripts |
+| 16 | [Extended Regular Expressions](../16-regex-extensions.md) | Lookahead, word boundaries, case folding and backreferences |
+| 17 | [Unicode Regex Modes](../17-regex-unicode.md) | UTF-8 code points, Unicode properties and simple case folding |
+| 18 | [Custom Error Messages](../18-custom-error-messages.md) | Error-message callbacks and context across target languages |
+| 19 | [Regex Runtime Budgets](../19-regex-runtime-budgets.md) | Steps, working memory, cancellation and structured failure states |
+| 20 | [Regex Compatibility and Check-Only Validation](../20-regex-compatibility.md) | Per-rule engines and validation that writes no output |
+| 21 | [Incremental Binary Generation](../21-incremental-generation.md) | Analysis caches, invalidation and corrupt-cache recovery |
+| 22 | [VS Code Workflow](../22-vscode-workflow.md) | Large-grammar sync, incremental generation and safe rename |
+| 23 | [Lepus Backend](../23-lepus-backend.md) | How Lepus output is generated, its API and regressions |
 
 ## Other Projects and Tools
 
@@ -46,9 +54,9 @@ The generator's implementation and manual live in this directory alongside the r
 | Editor | [VS Code extension](../../vscode/README.md) |
 | Documentation maintenance | [unified conventions, templates and documentation generator](../../project/document/README.md) |
 | Repository collaboration | [handover notes](../../AGENTS.md) · [grammar AI plugin](../../plugins/hareparse-grammar/README.md) |
-| Cross-project narratives | [02 Max-Level Grammar](../02-gram-legend.md) · [04 One .gram, Eight Languages](../04-hareparse-story.md) |
+| Cross-project narratives | [01 Max-Level Grammar](../01-gram-legend.md) |
 
-When changing any project, defer to that project's source, tests and local documentation; for the unified scope of the parser's languages and modes, see the [support matrix](../15-language-mode-support.md).
+When changing any project, defer to that project's source, tests and local documentation; for the unified scope of the parser's languages and modes, see the [support matrix](../14-language-mode-support.md).
 
 ## Custom Allocator Library
 

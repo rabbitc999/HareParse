@@ -6,7 +6,7 @@
 //
 // 真正的命令行实现是 `lsp::runCommandLine`（在 lsp.cpp 里）：HareParse 生成器
 // 把同一份源码编进去，用 `HareParse lsp` 提供完全一样的服务，见
-// doc/04-hareparse-story.md 与 library/lsp/README.md。
+// doc/11-i18n-and-packaging.md 与 library/lsp/README.md。
 #include "lsp.hpp"
 
 /**

@@ -1,10 +1,10 @@
-# 12 Modes Supported by Each Language and the Incremental API
+# 14 Modes Supported by Each Language and the Incremental API
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
 This chapter records the supported scope of the current version in one place. The nine code-generation targets are C99, C++17, Python, C#, Rust, Go, Java, JavaScript/TypeScript, and Lepus; `gram` is the grammar-and-analysis-report export profile, not a programming-language target. The default target is `cpp17` and the default mode is `ielr`. The command line `--lang` / `--mode` overrides `%lang` / `%mode` in the grammar.
 
-The algorithm, applicable scenarios and limitations of each mode are in [10 Generation Modes and Runtimes](13-modes.md), and artifacts and invocation are in [11 Target Languages, Output Artifacts, and API](14-languages-and-products.md).
+The algorithm, applicable scenarios and limitations of each mode are in [12 Generation Modes and Runtimes](12-modes.md), and artifacts and invocation are in [13 Target Languages, Output Artifacts, and API](13-languages-and-products.md).
 
 ## Generation Support Matrix
 
@@ -93,6 +93,6 @@ On 2026-09-28, Go's Earley/CYK artifacts were verified with `english-syntax`, `c
 
 On 2026-09-27, Java/JS DD and Earley artifacts were also verified with `dd_expr` and `chart_nullable`: Java 22 compiled and ran successfully, and Node.js 26 syntax-checked and directly ran `parser.ts` successfully, with output matching the existing `.expected`; the remaining modes are rejected at generation time. This is a generation-support check, not a compile test of all artifacts. Language limitations are in `Project::generateParserProject` of [`source/src/project.cpp`](../../source/src/project.cpp); mode classification is in [`source/src/analysis.cpp`](../../source/src/analysis.cpp).
 The incremental implementation lives in the C++17 and Rust runtime templates of [`source/templates/`](../../source/templates/).
-The dedicated regression entry point is in [06 Build, Templates and Small Tests](09-build-and-test.md).
+The dedicated regression entry point is in [04 Build and Test](../04-build-and-test.md).
 
-Lepus supports all 16 generation modes. It emits a self-contained `parser.lep` with native semantic actions and a Token API. See the [Lepus reference](../17-lepus-backend.md) for directives, lexical rules, and limitations.
+Lepus supports all 16 generation modes. It emits a self-contained `parser.lep` with native semantic actions and a Token API. See the [Lepus reference](../23-lepus-backend.md) for directives, lexical rules, and limitations.

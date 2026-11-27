@@ -3,14 +3,14 @@
 > 这是**生成器本体**的说明文档（命令行、模板、产物形态、构建与小测）。
 > 项目总览、Lepus 语言与全仓目录见根目录 [README](../README.md)。
 
-命令行支持 `--ui-lang zh|en|auto`，独立于 `--lang` 代码生成目标。内嵌手册（`HareParse man`）、内嵌语言服务器（`HareParse lsp`）、Windows Unicode 输出与 Python ZIP 发布脚本见 [16 显示语言、内嵌资产与发布](../doc/16-i18n-and-packaging.md)。
+命令行支持 `--ui-lang zh|en|auto`，独立于 `--lang` 代码生成目标。内嵌手册（`HareParse man`）、内嵌语言服务器（`HareParse lsp`）、Windows Unicode 输出与 Python ZIP 发布脚本见 [15 双语、内嵌资产与发布](../doc/15-i18n-and-packaging.md)。
 
 
 <img src="../image/gram-editor-256.png" alt="GramEditor 图标" width="120" align="right" />
 
-Yacc 风格的解析器生成器：一份 `.gram` 文法，十六种生成模式，输出 C99 / C++17 / Python / C# / Rust / Go / Java / JavaScript-TypeScript 解析器。八种目标语言 + 一个「只要文法与分析报告、不要代码」的导出档由 `--lang {c,cpp17,python,csharp,rust,go,java,js,gram}` / `%lang` 选（命令行优先，缺省 `cpp17`；Java 与 JS 当前支持 DD / Earley / CYK，`--lang gram` 只导出 `.gram` 原文件 + 分析报告）。
+Yacc 风格的解析器生成器：一份文法定义文件（`.gram`），十六种生成模式，输出 C99 / C++17 / Python / C# / Rust / Go / Java / JavaScript-TypeScript 解析器。八种目标语言 + 一个「只要文法与分析报告、不要代码」的导出档由 `--lang {c,cpp17,python,csharp,rust,go,java,js,gram}` / `%lang` 选（命令行优先，缺省 `cpp17`；Java 与 JS 当前支持 DD / Earley / CYK，`--lang gram` 只导出 `.gram` 原文件 + 分析报告）。
 
-各语言可用模式并不相同，完整清单见 [12 各语言支持的模式与增量 API](../doc/15-language-mode-support.md)：
+各语言可用模式并不相同，完整清单见 [14 各语言支持的模式与增量 API](../doc/14-language-mode-support.md)：
 C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS-TS
 各支持 DD、Earley、CYK 三种，`gram` 可导出全部 16 种。
 
@@ -25,7 +25,7 @@ C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS
 | **LL(k)**（教学/救急） | 预测分析表按 k 元组建列 | 按 k 个 Token 选产生式（`Select_k(A→α) = FIRST_k(α·FOLLOW_k(A))`），含左递归消除 |
 | **LL(0)**（教学） | 预测分析表只有一列 | 不看 lookahead，每个非终结符只能有一条产生式 |
 
-增量解析只提供给 C++17 / Rust：LL/DD 同文本复用、变更后重算；确定性 LR 从公共前缀内最近的 checkpoint 恢复。GLR 家族（含 Earley/CYK）保存 packed forest，支持父依赖传递失效、稳定节点 ID 复用、后缀跨度重映射和局部 forest 修补；GSS 控制流程与图表判定仍完整执行，Tree 结果重新物化。GLR 默认禁用语义复用，显式 `GlrSemanticReusePolicy::Pure` 且语义环境版本一致时才允许同文本成功结果复用，有歧义回调时禁用。具体 API、指标及完整增量解析尚未覆盖的边界见 [doc/12](../doc/15-language-mode-support.md)。
+增量解析只提供给 C++17 / Rust：LL/DD 同文本复用、变更后重算；确定性 LR 从公共前缀内最近的 checkpoint 恢复。GLR 家族（含 Earley/CYK）保存 packed forest，支持父依赖传递失效、稳定节点 ID 复用、后缀跨度重映射和局部 forest 修补；GSS 控制流程与图表判定仍完整执行，Tree 结果重新物化。GLR 默认禁用语义复用，显式 `GlrSemanticReusePolicy::Pure` 且语义环境版本一致时才允许同文本成功结果复用，有歧义回调时禁用。具体 API、指标及完整增量解析尚未覆盖的边界见 [doc/07](../doc/14-language-mode-support.md)。
 
 ### LR 家族
 
@@ -58,7 +58,7 @@ C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS
 
 | 模式 | 分析表 | 适用场景 |
 | --- | --- | --- |
-| **lex**（词法模式） | 没有分析表 | 只要词法器、不要解析器；可以一条产生式都不写，见[词法模式](../doc/13-modes.md#词法模式mode-lex) |
+| **lex**（词法模式） | 没有分析表 | 只要词法器、不要解析器；可以一条产生式都不写，见[词法模式](../doc/12-modes.md#词法模式mode-lex) |
 
 生成器只用 C++17 标准库，无第三方依赖；`source/templates/` 下的模板（**384 份，
 全部 `.tmpl`**，走 `library/template` 模板引擎）在构建期被内联进可执行文件，产出单个可执行文件
@@ -70,10 +70,10 @@ C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS
 
 这个项目采用人机协同开发：需求、文法设计、算法选型与代码取舍由人决定，AI 协助实现，
 最终由构建、目标工具链和回归样例验收。当前支持范围以
-[`doc/12`](../doc/15-language-mode-support.md) 为准。
+[`doc/07`](../doc/14-language-mode-support.md) 为准。
 
 图里每一条都能在仓库里查到：模式表见下面的「特性」，目标语言与产物形态见
-[`14 目标语言、产物与 API`](../doc/14-languages-and-products.md)，多份完整工程示例
+[`13 目标语言与产物`](../doc/13-languages-and-products.md)，多份完整工程示例
 （`pl0-ir` / `mini-basic` / `log-ir` / `todo-scan` / `bigint-calc` …）见
 [`project/README.md`](../project/README.md)。
 矢量版是同目录下的 [`tools/overview/HareParse-overview.svg`](../tools/overview/HareParse-overview.svg)，
@@ -85,11 +85,11 @@ C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS
 ## 目录
 
 - 用户手册与支持矩阵：
-  - [`11 目标语言、产物与 API`](../doc/14-languages-and-products.md)：八种目标语言（含 DD/Earley/CYK 专用 Java 与 JS/TS 窄后端）+ `--lang gram` 文法导出档的产物形态与选择
-  - [`09 用 .gram 写文法`](../doc/12-grammar-usage.md)：指令表、语义动作、语义值类型（`%value_type` / `%union` / `%type`）、`%tree` / `%copy`、冲突消解、错误恢复、条件编译（`%if`）、`%main` / `%epilogue`、报错定位（`#line`）
-  - [`10 生成模式与运行时`](../doc/13-modes.md)：LL / LR / GLR / Earley / CYK / 递归下降（DD）/ `lex` 十六种模式、教学模式、Mermaid 状态机图、词法匹配顺序
-  - [`12 各语言支持的模式与增量 API`](../doc/15-language-mode-support.md)：八种语言与 `gram` 的模式矩阵、C++17 / Rust 增量能力及纯度策略边界
-- 实现与规范：[`doc/01` 架构](../doc/03-architecture.md) · [`doc/02` 文法规范](../doc/05-grammar.md) · [`doc/03` 分析算法](../doc/06-analysis.md) · [`doc/04` 代码生成](../doc/07-codegen.md) · [`doc/05` 产物 API](../doc/08-generated-code.md) · [`doc/06` 构建与测试](../doc/09-build-and-test.md) · [`doc/07` 示例导读](../doc/10-examples.md) · [`doc/08` 工程示例](../doc/11-project-examples.md) · [`library/transfer` 教学库](../library/transfer/README.md) · [编辑器](#编辑器vs-code-插件)
+  - [`13 目标语言与产物`](../doc/13-languages-and-products.md)：八种目标语言（含 DD/Earley/CYK 专用 Java 与 JS/TS 窄后端）+ `--lang gram` 文法导出档的产物形态与选择
+  - [`11 用文法定义文件写文法`](../doc/11-grammar-usage.md)：指令表、语义动作、语义值类型（`%value_type` / `%union` / `%type`）、`%tree` / `%copy`、冲突消解、错误恢复、条件编译（`%if`）、`%main` / `%epilogue`、报错定位（`#line`）
+  - [`12 生成模式与运行时`](../doc/12-modes.md)：LL / LR / GLR / Earley / CYK / 递归下降（DD）/ `lex` 十六种模式、教学模式、Mermaid 状态机图、词法匹配顺序
+  - [`14 各语言支持的模式与增量 API`](../doc/14-language-mode-support.md)：八种语言与 `gram` 的模式矩阵、C++17 / Rust 增量能力及纯度策略边界
+- 实现与规范：[`doc/01` 架构](../doc/03-architecture.md) · [`doc/02` 文法规范](../doc/05-grammar.md) · [`doc/03` 分析算法](../doc/06-analysis.md) · [`doc/04` 代码生成](../doc/07-codegen.md) · [`doc/05` 产物 API](../doc/08-generated-code.md) · [`doc/06` 构建与测试](../doc/04-build-and-test.md) · [`doc/07` 示例导读](../doc/09-examples.md) · [`doc/08` 工程示例](../doc/10-project-examples.md) · [`library/transfer` 教学库](../library/transfer/README.md) · [编辑器](#编辑器vs-code-插件)
 
 ## 特性
 
@@ -163,7 +163,7 @@ C99 支持 13 种，C++17 / Python / C# / Rust / Go 各支持 16 种；Java / JS
 | 项目 | 说明 |
 | --- | --- |
 | 正则 Token | `%token regex` 与 `%identifier`：正则在生成期编译成极小 DFA（正则 → NFA → 子集构造 → 最小化），运行期只查表；标识符识别接口生成在 `parser_token` 模块里 |
-| **CSV 别名表** | `%token NAME include "词表.csv"`：从 CSV 里**追加**字面量别名（只取第一列等于 `NAME` 的行的第二列），关键字表 / 指令表 / 枚举名表这类海量别名不用往 `.gram` 里堆 `"a\|b\|c"`。只追加别名、不新建 Token，第二列一律按**字面量**处理（不编译正则），别名必须唯一。见 [`doc/09`](../doc/12-grammar-usage.md#用-csv-维护字面量别名表) |
+| **CSV 别名表** | `%token NAME include "词表.csv"`：从 CSV 里**追加**字面量别名（只取第一列等于 `NAME` 的行的第二列），关键字表 / 指令表 / 枚举名表这类海量别名不用往 `.gram` 里堆 `"a\|b\|c"`。只追加别名、不新建 Token，第二列一律按**字面量**处理（不编译正则），别名必须唯一。见 [`doc/04`](../doc/11-grammar-usage.md#用-csv-维护字面量别名表) |
 | 内建词法可覆盖 | `STRING` / `NUMBER` / `VARIABLE` 的默认词法规则，在用户用 `%define` / `%token NAME "..."` / `%token regex NAME "..."` 为同名 Token 声明规则后自动让位，完全由用户规则接管 |
 | 空白也能当 Token | `\b` / `%space`：`%token NL "\n"` 让换行变成真实 Token（按行写的 DSL 就这么写），`%token SP "\b"` 用 `\b` 通配「一个空白字符」来强制空白，`%space " \t"` 决定取 Token 前跳过哪些空白 |
 | 只要词法器 | `%mode lex`：产物里没有解析器，只有 `lexer.c` / `lexer.h`（C++17 是 `lexer.hpp` / `lexer.cpp`，Python 是 `lexer.py`）+ 演示入口，可以一条产生式都不写；命令行跑词法模式时直接读输入逐个打印 Token 类型，适合先验证词法规则 |
@@ -266,7 +266,7 @@ C99 产物，在命令行加 `--lang c`，此时可以直接
 `gcc -std=c99 -Wall -Wextra -O2 *.c -lm -o parser_demo`。C 与 C++17 产物都自带
 `Makefile` 与 `CMakeLists.txt`，`make lib` 只编译静态库 `libparser.a`；不想装
 编译器时用 `--lang python` 出 `parser.py` / `main.py`（见
-[Python 产物](../doc/14-languages-and-products.md#python-产物给文法做快速分析--lang-python)）。
+[Python 产物](../doc/13-languages-and-products.md#python-产物给文法做快速分析--lang-python)）。
 
 每次生成都会在输出目录写入 `.hareparse-manifest`，切换目标语言或重新生成时会据此
 删除已经过期的旧产物。要只清空该目录中由生成器登记的文件，可执行
@@ -305,7 +305,7 @@ term := NUMBER         { $$ = $1; }
 | `example/calc_branch.gram` | 同上，但候选全部写成一条 `\|` 分支规则 | `example/calc_branch_out/` |
 | `example/or_branch.gram` | `\|` 分支写法的对照示例：每个候选一条分支、各带动作 | `example/or_branch_out/` |
 | `example/logic.gram` | 布尔表达式，`%mode slr` + `%left/%right` 优先级 + `\|` 分支 | `example/logic_out/` |
-| `example/lr0.gram` | 真 LR(0) 文法（5 个状态、无冲突），`%mode lr0` + `%teach` + `%mermaid`，用来讲 LR 自动机、整行归约与[状态机图示](../doc/13-modes.md#状态机图示mermaid) | `example/lr0_out/` |
+| `example/lr0.gram` | 真 LR(0) 文法（5 个状态、无冲突），`%mode lr0` + `%teach` + `%mermaid`，用来讲 LR 自动机、整行归约与[状态机图示](../doc/12-modes.md#状态机图示mermaid) | `example/lr0_out/` |
 
 ### LL 与树结构
 
@@ -446,7 +446,7 @@ printf 'x := 1 + 2 * 3 .' | dotnet run
                         「未消解冲突」就收尾，省略末尾的「## 文法分析报告」
                         （那一节的正文随时可以用 --report 文件单独导出）
   --mode {ll0,ll1,llk,lr0,slr,slrk,lalr,lalrk,lr1,lrk,ielr,glr,earley,cyk,dd,lex}
-                        生成模式（默认 ielr；覆盖 %mode；语言支持范围见 doc/12）
+                        生成模式（默认 ielr；覆盖 %mode；语言支持范围见 doc/14）
                         lr0 / lr1 算规范 LR(0) / LR(1) 自动机与分析表：不用任何
                         开关就能用，未消解冲突只报不中止；
                         lex 是词法模式，只生成词法器
@@ -490,7 +490,7 @@ printf 'x := 1 + 2 * 3 .' | dotnet run
 ```
 
 文法指令（`%token` / `%define` / `%mode` / `%if` …，含 `%token NAME include "csv"`
-这种从 CSV 追加字面量别名的写法）见 [`doc/12-grammar-usage.md`](../doc/12-grammar-usage.md)
+这种从 CSV 追加字面量别名的写法）见 [`doc/11-grammar-usage.md`](../doc/11-grammar-usage.md)
 与 [`doc/05-grammar.md`](../doc/05-grammar.md)。
 
 生成完成后控制台只打一行 `解析完成，解析详情参考 <out-dir>/RESULT.md`：产物清单、
@@ -613,7 +613,7 @@ make -C source test-repro     # 同一份文法生成到两个目录，产物与
 | 期望文件 | 读 `example/<name>.expected`；需要按语言分开时是 `<name>.<lang>.expected` |
 | 缺工具链 | 某档的工具链（gcc / g++ / python / dotnet / cargo / go）没装就整档跳过并打印一句，缺工具链不算失败 |
 | 重录期望 | 改了期望行为后用 `tools/smoke.sh capture` 重录（取该行第一个可用的语言档；与其它档输出不同时另存 `<name>.<lang>.expected`） |
-| 细节 | 见 [`doc/09-build-and-test.md`](../doc/09-build-and-test.md) §4 |
+| 细节 | 见 [`doc/04-build-and-test.md`](../doc/04-build-and-test.md) §4 |
 
 ### 实测覆盖（按 `example/manifest.tsv`）
 
@@ -630,7 +630,7 @@ make -C source test-repro     # 同一份文法生成到两个目录，产物与
 C# 少得多的原因：
 
 - 不少示例的用户代码（`%code` / `%main` / `%epilogue`）写的是 C，只列语言中立的文法。
-- `%mode lex` 已经六档都支持，各自的词法导出见 [`doc/13-modes.md`](../doc/13-modes.md#词法模式mode-lex)。
+- `%mode lex` 已经六档都支持，各自的词法导出见 [`doc/12-modes.md`](../doc/12-modes.md#词法模式mode-lex)。
 - 完整的例外逐条写在 manifest 表头。
 
 ### 编译参数
@@ -775,7 +775,7 @@ GBK(936)，按默认设置直接输出会显示成乱码，所以构建与运行
 │   ├── glue/          标准宿主胶水与应用胶水（手写 C++，导出时原样内嵌）
 │   ├── samples/ expected/  70 个正常样例及固定输出
 │   └── samples-error/ expected-error/  105 个错误路径及诊断
-├── project/         九个完整工程示例（总入口 project/README.md，详述见 ../doc/11-project-examples.md）
+├── project/         九个完整工程示例（总入口 project/README.md，详述见 ../doc/10-project-examples.md）
 │   ├── pl0-ir/      PL/0 → 三元式 / 四元式（C++17，LALR，注释走 %trivia）
 │   ├── mini-basic/  Mini-BASIC → 栈式字节码 + 128 行虚拟机（C++17，%left/%prec、$line）
 │   ├── log-ir/      结构化日志 → JSON（Python，%commit 收注释 + 位置 API）
@@ -837,22 +837,22 @@ GBK(936)，按默认设置直接输出会显示成乱码，所以构建与运行
 
 | 文档 | 内容 |
 | --- | --- |
-| [`doc/12-grammar-usage.md`](../doc/12-grammar-usage.md) | **用户手册**：用 `.gram` 写文法（指令表、语义动作、语义值类型、`%tree` / `%copy`、冲突消解、错误恢复、`%if`、`%main` / `%epilogue`、`#line`）；从本文件拆出 |
-| [`doc/13-modes.md`](../doc/13-modes.md) | **用户手册**：十六种生成模式与运行时（LL / LR / GLR / Earley / CYK / 递归下降 `dd` / `lex`）、教学模式、Mermaid 状态机图、词法匹配顺序；从本文件拆出 |
-| [`doc/14-languages-and-products.md`](../doc/14-languages-and-products.md) | **用户手册**：八种目标语言与产物形态（+ 文法导出档 `--lang gram`）、生成产物清单、生成代码 API 与各后端边界 |
+| [`doc/11-grammar-usage.md`](../doc/11-grammar-usage.md) | **用户手册**：用 `.gram` 写文法（指令表、语义动作、语义值类型、`%tree` / `%copy`、冲突消解、错误恢复、`%if`、`%main` / `%epilogue`、`#line`）；从本文件拆出 |
+| [`doc/12-modes.md`](../doc/12-modes.md) | **用户手册**：十六种生成模式与运行时（LL / LR / GLR / Earley / CYK / 递归下降 `dd` / `lex`）、教学模式、Mermaid 状态机图、词法匹配顺序；从本文件拆出 |
+| [`doc/13-languages-and-products.md`](../doc/13-languages-and-products.md) | **用户手册**：八种目标语言与产物形态（+ 文法导出档 `--lang gram`）、生成产物清单、生成代码 API 与各后端边界 |
 
 ### 实现与规范
 
 | 文档 | 内容 |
 | --- | --- |
 | [`doc/03-architecture.md`](../doc/03-architecture.md) | 总体架构、模块职责、数据流 |
-| [`doc/05-grammar.md`](../doc/05-grammar.md) | `.gram` 文法规范与生成期校验 |
+| [`doc/04-build-and-test.md`](../doc/04-build-and-test.md) | 构建、模板重建与小测流程 |
+| [`doc/05-grammar.md`](../doc/05-grammar.md) | 文法定义文件（`.gram`）规范与生成期校验 |
 | [`doc/06-analysis.md`](../doc/06-analysis.md) | LL(1) / LR(0) / SLR(1) / LALR(1) / LR(1) / IELR(1) 的形式化理论（TeX 公式）与实现 |
 | [`doc/07-codegen.md`](../doc/07-codegen.md) | 代码生成与模板系统（`%tree` / `%copy`）、C++17 / Python / C# / Rust 语言后端、文法导出档 `--lang gram` |
 | [`doc/08-generated-code.md`](../doc/08-generated-code.md) | 生成产物清单与生成代码的 C / C++17 / Python / C# / Rust / Go API、文法导出档 `--lang gram` 的产物 |
-| [`doc/09-build-and-test.md`](../doc/09-build-and-test.md) | 构建、模板重建与小测流程 |
-| [`doc/10-examples.md`](../doc/10-examples.md) | `example/` 下 46 个示例文法导读 |
-| [`doc/11-project-examples.md`](../doc/11-project-examples.md) | `project/` 下九个工程示例及根目录 Lepus 的导读（主体是 `pl0-ir`） |
+| [`doc/09-examples.md`](../doc/09-examples.md) | `example/` 下 46 个示例文法导读 |
+| [`doc/10-project-examples.md`](../doc/10-project-examples.md) | `project/` 下九个工程示例及根目录 Lepus 的导读（主体是 `pl0-ir`） |
 | [`project/protocol-dsl/README.md`](../project/protocol-dsl/README.md) | **二进制协议 DSL 与代码生成器**：Python / C++17 / Rust 三套编译器均使用 HareParse 前端；一份 `.pdl` 输出 Python / C++17 / 零分配 C99 / `no_std` Rust 编解码器及 Markdown / Mermaid 文档 |
 
 ### 附加库
@@ -883,7 +883,7 @@ GBK(936)，按默认设置直接输出会显示成乱码，所以构建与运行
 
 | 文档 | 内容 |
 | --- | --- |
-| [`doc/02-gram-legend.md`](../doc/02-gram-legend.md) | 作者**糖糖**的虚构外传《满级文法》；含增量解析、严格 C-- 五实验及 Java/JS 窄后端番外，人物与剧情纯属虚构 |
+| [`doc/01-gram-legend.md`](../doc/01-gram-legend.md) | 作者**糖糖**的虚构外传《满级文法》；含增量解析、严格 C-- 五实验及 Java/JS 窄后端番外，人物与剧情纯属虚构 |
 
 另有 [`project/lab_report_axhu/`](../project/lab_report_axhu/README.md)：安徽新华学院编译原理课程的三份实验报告，均用本工具实现
 ——**文法类型判断**（Chomsky 0/1/2/3 型）、**PL/0 词法分析**（`%mode lex`）、
@@ -1050,7 +1050,7 @@ t1t transfer demo.quad --target=mips --data=demo.data.bin --layout=demo.layout
 设计 `.gram` 文法与指令、挑选 LL(1) / SLR(1) / LALR(1) / IELR(1) 算法、
 审查生成结果与取舍性能优化；**Codex + DeepSeek/GPT6** 负责把方案落成可编译的实现、
 模板、示例与文档。人给方向，AI 协助实现，再由真实生成、编译和运行结果验收。
-当前事实由源码、测试和专题文档共同维护；生成模式支持查 [`doc/12`](../doc/15-language-mode-support.md)。
+当前事实由源码、测试和专题文档共同维护；生成模式支持查 [`doc/07`](../doc/14-language-mode-support.md)。
 
 ## 许可证
 

@@ -95,7 +95,7 @@ make -C project/pl0-ir ENGINE=../../build/bin/HareParse
 `std::vector`，名字池是 `std::vector<std::string>`，限定名前缀和词素是 `std::string`。
 所以没有定长数组，也没有「256 个符号 / 1024 条三元式 / 128 个标签 / 16 层嵌套」
 这类上限——只受内存限制。（语义值 `ParserValue_T` 本身仍是 POD：运行时会对它整块
-清零和按值拷贝，所以名字只存名字池下标，见 [`../../doc/11-project-examples.md`](../../doc/11-project-examples.md) §3。）
+清零和按值拷贝，所以名字只存名字池下标，见 [`../../doc/10-project-examples.md`](../../doc/10-project-examples.md) §3。）
 
 ## 三元式与四元式
 
@@ -217,7 +217,7 @@ x 不是过程
 
 `%trivia` = **匹配即丢**：命中的文本不进语法层，也不进 `%commit` 容器（想把注释
 收起来给 AI 看，把 `%trivia` 换成 `%commit <类型> "…"` 就是收进容器，见
-[`../../doc/12-grammar-usage.md`](../../doc/12-grammar-usage.md#commit把识别但不进语法层的文本收进容器)）。
+[`../../doc/11-grammar-usage.md`](../../doc/11-grammar-usage.md#commit把识别但不进语法层的文本收进容器)）。
 这么做的好处是**解析器本身**就认识注释：当库用 `Parser_RunText()` 时，调用方
 不必先写一遍剥注释的代码；报错行列号也天然与原文一致（原文一个字节都没动）。
 

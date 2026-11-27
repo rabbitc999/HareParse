@@ -1,4 +1,4 @@
-# 18 Unicode 正则模式
+# 17 Unicode 正则模式
 
 在正则开头写 `(?u)`，启用按 UTF-8 Unicode 标量值匹配的模式；写 `(?iu)` 或 `(?ui)`
 同时启用 Unicode 简单大小写折叠。也可以分开写成 `(?i)(?u)`。
@@ -60,7 +60,7 @@ POSIX 类如 `[[:alpha:]]`、`[[:digit:]]`、`[[:upper:]]` 也使用对应的 Un
 覆盖希腊字母、西里尔字母、Deseret 等字符以及 `K/k`、`ſ/s` 等等价关系。
 字符类先完成折叠闭包，再取补集；例如 `(?iu)[^k]` 不能匹配 Kelvin 符号 `K`。
 
-Unicode 模式可以与[扩展正则](17-regex-extensions.md)的捕获、数字反向引用、
+Unicode 模式可以与[扩展正则](16-regex-extensions.md)的捕获、数字反向引用、
 正负前瞻和非贪婪量词组合：
 
 ```text

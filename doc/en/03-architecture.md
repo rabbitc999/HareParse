@@ -1,8 +1,8 @@
-# 01 Overall Architecture
+# 03 Overall Architecture
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-The combination constraints of languages and modes, and the unified scope of the incremental API, are described in [12 Support Matrix](../15-language-mode-support.md).
+The combination constraints of languages and modes, and the unified scope of the incremental API, are described in [14 Support Matrix](../14-language-mode-support.md).
 
 ## 1. Pipeline
 
@@ -70,7 +70,7 @@ The entry point, grammar loading, analysis, code generation, and output template
 | `source/include/HareParse/` | Data models and public interfaces |
 | `` | Topic-specific documentation for the generator |
 
-For the ownership of the other projects and add-on libraries in the repository, see [Repository Overview](../01-overview.md).
+For the ownership of the other projects and add-on libraries in the repository, see [Repository Overview](../02-overview.md).
 
 ## 3. Module Responsibilities
 

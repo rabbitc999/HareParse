@@ -1,6 +1,6 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# Display Language, Embedded Assets and Release
+# 15 Display Language, Embedded Assets and Release
 
 The HareParse command line supports Chinese and English. The code generation target is still controlled by options such as `--lang cpp17`; the display language uses the separate `--ui-lang`.
 
@@ -25,19 +25,19 @@ at runtime** — the executable can be copied anywhere on its own and still be q
 
 ```sh
 HareParse man                     # index: 18 doc pages + directive / mode / language / example lists
-HareParse man 12-grammar-usage    # show one page (`man 12`, `man %token` work too)
+HareParse man 11-grammar-usage    # show one page (`man 11`, `man %token` work too)
 HareParse man directives          # every %directive, each with a one-line summary
 HareParse man modes               # the 16 generation modes: usage + one-line purpose
 HareParse man languages           # target languages and how many modes each supports
 HareParse man examples            # the example grammars in example/
 HareParse man --search lookahead   # full-text search (page bodies / directives / modes / languages)
 HareParse man --json              # machine-readable (for editors and scripts)
-HareParse man --lang en 04        # body language: zh / en / ja / auto (auto-detected by default)
+HareParse man --lang en 12        # body language: zh / en / ja / auto (auto-detected by default)
 ```
 
 | Point | Detail |
 | --- | --- |
-| Data source | `doc/*.md` + `doc/en/*.md` + `example/manifest.tsv`; `09-build-and-test.md` and `09-extra.md` are **excluded** (that pair is this repository's own build and experiment log and should not ship with a compiler installed elsewhere) |
+| Data source | `doc/*.md` + `doc/en/*.md` + `example/manifest.tsv`; `04-build-and-test.md` is **excluded** (it is this repository's own build and test log and should not ship with a compiler installed elsewhere) |
 | Re-embedding | after editing `doc/`, run `make -C source manual` (equivalent to `python tools/embed_manual.py`) and rebuild |
 | Size | about 1.3 MB of Markdown compressed by `library/lztext` to about 0.4 MB (ratio ≈ 0.29), producing a C++ byte array of roughly 2 MB |
 | Bilingual pages | pages that have an English edition are marked `[en]` in the index, and the footer shows `来源：doc/<name>` / `英文版：doc/en/<name>`; the English body is used with `--lang en` or when the display language resolves to English |
@@ -67,9 +67,9 @@ Arguments, exit codes and diagnostic format are identical to the separately buil
 | Validating a grammar | `HareParse lsp --check FILE`; `error` / `warning` / `info` map to the three severities of the problems panel |
 | Bundling the compiler | while packaging, `vscode/tools/embed-compiler.js` copies `HareParse[.exe]` into `vscode/bin/` (skipped when the content already matches; `vscode/bin/` is not checked in) |
 | Platform tag | `vscode/tools/package.js` writes `TargetPlatform` (e.g. `win32-x64`) into the `.vsix` `Identity` and appends the same suffix to the file name; `--universal` produces a tag-free package |
-| Opening the manual | `Gram: 打开文法指令手册` prefers `doc/12-grammar-usage.md` in the repository; when the repository is not next to the extension it falls back to `HareParse man 12-grammar-usage` and shows the same text inside the editor |
+| Opening the manual | `Gram: 打开文法指令手册` prefers `doc/11-grammar-usage.md` in the repository; when the repository is not next to the extension it falls back to `HareParse man 11-grammar-usage` and shows the same text inside the editor |
 
-The extension's own layout, commands and packaging details are in [`vscode/README.md`](../vscode/README.md).
+The extension's own layout, commands and packaging details are in [`vscode/README.md`](../../vscode/README.md).
 
 ## Windows Encoding
 

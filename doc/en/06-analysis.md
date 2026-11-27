@@ -1,8 +1,8 @@
-# 03 Grammar Analysis: LL(1) / SLR(1) / LALR(1) / IELR(1)
+# 06 Grammar Analysis: LL(1) / SLR(1) / LALR(1) / IELR(1)
 
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-This chapter explains the analysis algorithms; backend mode support and incremental runtime capabilities are covered uniformly in [12 Support Matrix](../15-language-mode-support.md).
+This chapter explains the analysis algorithms; backend mode support and incremental runtime capabilities are covered uniformly in [14 Support Matrix](../14-language-mode-support.md).
 
 ## 1. File layout
 
@@ -475,7 +475,7 @@ The FOLLOW computed by the analysis layer does more than go into the report: the
 `s_ParserFollow` (C) / `kLlFollow` (C++17) / `_LL_FOLLOW` (Python) in the output artifacts, for run-time **FOLLOW-set error
 recovery**—the FOLLOW of a non-nullable non-terminal is not in the prediction table, and recovery's "current Token is in the FOLLOW of this
 top-of-stack item → give up this layer" relies entirely on it (see
-[`05-grammar.md` §3.2](../05-grammar.md)).
+[`05-grammar.md` §3.2](../05-grammar.md).
 
 ## 5. LR(0) / LR(1) canonical-automaton modes (`analysis_lr0.cpp` / `analysis_lr1.cpp`)
 

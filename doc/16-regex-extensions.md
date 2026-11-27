@@ -1,4 +1,4 @@
-# 17 扩展正则表达式
+# 16 扩展正则表达式
 
 C99 与 C++17 的 `%token regex`、`%identifier`、`%commit`、`%trivia`
 支持前瞻、词边界、全局忽略大小写和数字反向引用。
@@ -74,4 +74,4 @@ python tests/cpp_dfa_std.py
 和 C++17 `dfa` 词法器，比较 Token、行列、commit 原文、trivia 丢弃、匹配失败和非法规则诊断，
 并同时启用 Mermaid 验证生成流程。
 
-通过 `(?u)` / `(?iu)` 启用码点、Unicode 属性及简单大小写折叠，见 [18 Unicode 正则模式](18-regex-unicode.md)。
+通过 `(?u)` / `(?iu)` 启用码点、Unicode 属性及简单大小写折叠，见 [17 Unicode 正则模式](17-regex-unicode.md)。

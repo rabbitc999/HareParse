@@ -1,8 +1,8 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# 07 Examples Guide
+# 09 Examples Guide
 
-The target language of an example is determined by the manifest and the grammar constraints; for the full range of supported modes see [12 Support Matrix](../15-language-mode-support.md).
+The target language of an example is determined by the manifest and the grammar constraints; for the full range of supported modes see [14 Support Matrix](../14-language-mode-support.md).
 
 There are 46 grammars under `example/`, and generating + compiling each one is enough to catch most regressions — `make -C source test-smoke` runs this pass automatically according to
 [`example/manifest.tsv`](../../example/manifest.tsv) (it exits non-zero if the output does not match
@@ -94,7 +94,7 @@ syntax tree nodes and the two results of prepositional-phrase attachment; Python
 The order in which `dd_expr.gram`'s productions are written is the order they are tried (`LPAREN expr RPAREN` → `NUMBER PLUS expr`
 → `NUMBER`), and feeding `1 + 2` yields the right-associative tree `NUMBER(1) PLUS(+) expr(NUMBER(2))`;
 a left-recursive grammar (like the one in `calc.gram`) is stopped at generation time with a rewriting suggestion.
-For usage and limitations see "recursive descent (`%mode dd`)" in [`13-modes.md`](../13-modes.md).
+For usage and limitations see "recursive descent (`%mode dd`)" in [`12-modes.md`](../12-modes.md).
 
 ## 8. User Code, Entry Points and Target Languages
 
@@ -278,6 +278,6 @@ the `%main` entry point of `main_demo` parses `argv` itself and runs according t
 3. Try generating with `./build/bin/HareParse --grammar-file example/<名字>.gram --out-dir /tmp/<名字>`;
 4. Add a line `名字<TAB>实测支持的档<TAB>固定输入` to [`example/manifest.tsv`](../../example/manifest.tsv), and run
    `tools/smoke.sh capture` once (**the script is currently a stub**, so you first have to let it through; or generate + compile + feed
-   input by hand as in [`09-build-and-test.md`](../09-build-and-test.md) §4) to produce `example/<名字>.expected`;
+   input by hand as in [`04-build-and-test.md`](../04-build-and-test.md) §4) to produce `example/<名字>.expected`;
 5. `make -C source test-smoke` should turn green (**the script is currently a stub**, so before letting it through verify with the manual approach in §4);
    a `.gram` under `example/` that is missing from the manifest reports FAIL.

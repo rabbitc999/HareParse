@@ -1,13 +1,13 @@
 > This is the English edition. The Chinese edition is the default and is the one maintained first — see [中文文档](../README.md)。
 
-# 09 Writing Grammars in `.gram` (User Manual)
+# 11 Writing Grammars in a Grammar Definition File (`.gram`)
 
-This chapter was split out of [`README.md`](../../README.md): the `.gram` directive tables, semantic actions, semantic value types and user code injection, conflict resolution, error recovery, conditional compilation (`%if`), custom entry points (`%main` / `%epilogue`) and error location (`#line`).
+This chapter was split out of [`README.md`](../../README.md): the directive tables of a grammar definition file (`.gram`), semantic actions, semantic value types and user code injection, conflict resolution, error recovery, conditional compilation (`%if`), custom entry points (`%main` / `%epilogue`) and error location (`#line`).
 
 For the specification and generation-time validation, see [`05-grammar.md`](../05-grammar.md); for the translation and template implementation, see [`07-codegen.md`](../07-codegen.md); for the API on the artifact side, see [`08-generated-code.md`](../08-generated-code.md).
-Before choosing a target language and mode, first check [12 Modes Supported by Each Language and the Incremental API](../15-language-mode-support.md).
+Before choosing a target language and mode, first check [14 Modes Supported by Each Language and the Incremental API](../14-language-mode-support.md).
 
-## Writing `.gram` Grammars
+## Writing Grammar Definition Files
 
 There are two ways to write a rule: **one per line** (write several lines with the same left-hand side), or yacc-style `|` branches (several branches of the same left-hand side written together). In the branch form each branch carries its own action, and the whole rule **must end with `;`**:
 
@@ -30,11 +30,11 @@ An action may be written as `{ ... }`, or written at the end of the line without
 | `%space "whitespace"` | Which whitespace to skip before taking a token (default `"\b"` = all whitespace; `%space ""` = skip none). `\b` written in `%token` is a wildcard for "one whitespace character", while written in `%space` it stands for all whitespace |
 | `%start name` | The start non-terminal (defaulting to the left-hand side of the first rule) |
 | `%example "text"` | The example input used when generating documentation; at most once; supports string escapes such as `\\`, `\"`, `\n`, `\t`, while `\0` is rejected because it cannot be passed through the command line. The `RESULT.md` of the eight code backends uses it in the command-line and API examples; when undeclared, it displays `<符合文法的语言>` |
-| `%mode ll1 \| ll0 \| llk \| lr0 \| slr \| slrk \| lalr \| lalrk \| lr1 \| lrk \| ielr \| glr \| earley \| cyk \| dd \| lex` | The generation mode; when it disagrees with the command-line `--mode`, the command line wins, and the default is `ielr`. `earley` / `cyk` support C++17, Python, C# and Rust artifacts; for a description of each mode see [Generation Modes and Runtimes](../13-modes.md) |
+| `%mode ll1 \| ll0 \| llk \| lr0 \| slr \| slrk \| lalr \| lalrk \| lr1 \| lrk \| ielr \| glr \| earley \| cyk \| dd \| lex` | The generation mode; when it disagrees with the command-line `--mode`, the command line wins, and the default is `ielr`. `earley` / `cyk` support C++17, Python, C# and Rust artifacts; for a description of each mode see [Generation Modes and Runtimes](../12-modes.md) |
 | `%lookahead N` (or written into the mode name `LL(2)`; command line `--lookahead N`) | The lookahead length k, 0..INT_MAX, default 2; it is meaningful only for `lrk` / `lalrk` / `slrk` / `llk` / `ll0` (writing it with any other mode is a direct error). For N = 1 these are equivalent to `lr1` / `lalr` / `slr` / `ll1` respectively. **There is no policy limit**, but a large k makes `FIRST_k` / `FOLLOW_k` and the number of columns grow exponentially (when the column encoding does not fit in 64 bits, generation reports an error and gives the bound for this grammar) |
-| `%teach` | Turns on [teaching mode](../13-modes.md#教学模式教学提示与教学对照); equivalent to the command-line `--teach` (`--no-teach` overrides it in the opposite direction); default **off** |
-| `%mermaid` | Generates the [Mermaid state machine diagrams](../13-modes.md#状态机图示mermaid); equivalent to the command-line `--mermaid` (`--no-mermaid` overrides it in the opposite direction); default **off**; independent of `%teach` |
-| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | The artifact language; when it disagrees with the command-line `--lang`, the command line wins, and when both are absent `cpp17` is used. `gram` generates no code: it only exports the original grammar file + the analysis report, see [`14-languages-and-products.md`](../14-languages-and-products.md#文法导出--lang-gram) |
+| `%teach` | Turns on [teaching mode](../12-modes.md#教学模式教学提示与教学对照); equivalent to the command-line `--teach` (`--no-teach` overrides it in the opposite direction); default **off** |
+| `%mermaid` | Generates the [Mermaid state machine diagrams](../12-modes.md#状态机图示mermaid); equivalent to the command-line `--mermaid` (`--no-mermaid` overrides it in the opposite direction); default **off**; independent of `%teach` |
+| `%lang c \| cpp17 \| python \| csharp \| rust \| go \| gram` | The artifact language; when it disagrees with the command-line `--lang`, the command line wins, and when both are absent `cpp17` is used. `gram` generates no code: it only exports the original grammar file + the analysis report, see [`13-languages-and-products.md`](../13-languages-and-products.md#文法导出--lang-gram) |
 | `%class NAME` | The parser class name of the Python artifacts (equivalent to `--class`, the command line takes precedence; default `Parser`); NAME matches `[A-Za-z_][A-Za-z0-9_]*` and may not be a Python keyword; valid only for `--lang python`, and pairing it with C / C++17 is an error |
 | `%package NAME` | C#: `namespace NAME;` / Rust: the crate name (`package.name` of `Cargo.toml`) / Go: the module path (the `module` of `go.mod`, `::` normalized to `/`); NAME is a segmented identifier (joined by `.` or `::`, e.g. `MyApp.Compiler`); valid only for `--lang csharp` / `--lang rust` / `--lang go`, and under other target languages it notes and ignores it |
 | `%import NAME` | C#: `using NAME;` / Rust: `use NAME;` / Go: `import ( … )` (`::` normalized to `/`, packages that duplicate the standard library are skipped); repeatable, and the last segment may be `*` (e.g. `System.Collections.*`); valid only for csharp / rust / go, and under other target languages it notes and ignores it |
@@ -75,13 +75,13 @@ An action may be written as `{ ... }`, or written at the end of the line without
 | `%left` / `%right` / `%nonassoc` | Declares token associativity and precedence; within a line it increases from left to right, and later lines are higher |
 | `%prec TOKEN` | Written at the end of a production's right-hand side to override the source of that production's precedence |
 | `%expect N` | Allows N unresolved shift/reduce conflicts to be kept |
-| `%token regex NAME "regex"` | Defines a token with a regex (C uses DFA or the shared ordered runtime; C++ selects `std` / `dfa` / `vm`, with shared execution for Unicode; other targets use native libraries. See the [compatibility report](../21-regex-compatibility.md)) |
+| `%token regex NAME "regex"` | Defines a token with a regex (C uses DFA or the shared ordered runtime; C++ selects `std` / `dfa` / `vm`, with shared execution for Unicode; other targets use native libraries. See the [compatibility report](../20-regex-compatibility.md)) |
 | `%identifier "regex"` | Declares the identifier regex and generates the identifier-recognition and keyword-lookup interface |
 | `%commit [type] "pattern"` / `%commit skip "pattern"` | Collects text that is "recognized but does not enter the grammar layer" into a container (elements `{line, type, text}`); when the type is omitted it is `default`, and `skip` means discard on match. Patterns are compiled as regexes and share the same longest-match order as `%token` (equal lengths by declaration order); see [`%commit`](#commit-collecting-text-that-is-recognized-but-does-not-enter-the-grammar-layer). **All six profiles support it** (C99 / C++17 / Python / C# / Rust / Go); for each profile's container type and ownership see [`08-generated-code.md`](../08-generated-code.md) |
 | `%trivia keep "pattern"` | Retains the matched comment text and source position while skipping it for parsing |
 | `%trivia "pattern"` | Discard on match: it enters neither the container nor the grammar layer. Completely equivalent to `%commit skip "pattern"` (the two spellings generate byte-for-byte identical lexical tables); using `%trivia` to express trivia is recommended; ordering and conflict rules are the same as `%commit` |
 | `%copy [file\|dir] path` | Copies the library files / directories under the grammar directory into the artifact directory; default `file`, and the copied `.c`/`.h` enter `Makefile` / `CMakeLists.txt` |
-| `%cpp_only` | Declares "this grammar can only generate C++17 artifacts": pairing it with `--lang c` / `--lang python` / `--lang csharp` / `--lang rust` / `--lang go` (or writing those in `%lang`) is a direct error; see [Grammars That Can Only Produce C++17](../14-languages-and-products.md#只能出-c17-的文法cpp_only) |
+| `%cpp_only` | Declares "this grammar can only generate C++17 artifacts": pairing it with `--lang c` / `--lang python` / `--lang csharp` / `--lang rust` / `--lang go` (or writing those in `%lang`) is a direct error; see [Grammars That Can Only Produce C++17](../13-languages-and-products.md#只能出-c17-的文法cpp_only) |
 
 ### Maintaining a Literal Alias Table with CSV
 
@@ -158,7 +158,7 @@ program := NUMBER "+" NUMBER;
 ```
 
 Rules: the pattern is a regex (without metacharacters it is a fixed literal; the C/C++ shared
-runtime supports lazy matching; see the [compatibility report](../21-regex-compatibility.md)); the matched text **does not enter the grammar layer
+runtime supports lazy matching; see the [compatibility report](../20-regex-compatibility.md)); the matched text **does not enter the grammar layer
 and is not treated as a token**,
 but is appended to the container in order of appearance, with elements `{line, type, text}` — `line` is the 1-based
 line number where the fragment starts, and `text` is the original text (including the literal itself; a multi-line fragment keeps its newlines). Matching
@@ -205,7 +205,7 @@ The `*` after the group permits zero or more body fragments. Omitting it changes
 language; that is not evidence of a negated-class or DFA construction bug. Empty bodies, ordinary
 text, repeated stars and Chinese text are verified with C DFA, C++ standard regex and the shared
 ordered runtime. Lazy expressions are also supported; C selects the ordered runtime for them.
-See [the compatibility report](../21-regex-compatibility.md) for actual engine selection and guarantees.
+See [the compatibility report](../20-regex-compatibility.md) for actual engine selection and guarantees.
 
 ## Semantic Actions
 
@@ -250,7 +250,7 @@ refer to a struct defined in the user code):
 when `%value_type` is written, the user code must not define `ParserValue_T` again.
 
 For a comparison of the semantic value types of each profile's artifacts (C# must use the target language's own type name) see
-[`14-languages-and-products.md`](../14-languages-and-products.md): for C#, when nothing is written it
+[`13-languages-and-products.md`](../13-languages-and-products.md): for C#, when nothing is written it
 is `object`; `%union` generates a class with member fields in C#
 (members are written in each language's field syntax, and sections are still separated by `;`).
 
@@ -265,7 +265,7 @@ The old `%{{ ... }}%` syntax is disabled, and loading prompts you to switch to `
 
 Under Python artifacts (`--lang python`) this body does not generate `parser_user.h`; it is inserted after the
 `import`s in `parser.py` (indentation is normalized by Python rules, see
-[Python Output](../14-languages-and-products.md#python-产物给文法做快速分析--lang-python)).
+[Python Output](../13-languages-and-products.md#python-产物给文法做快速分析--lang-python)).
 
 ```text
 %code
@@ -436,7 +436,7 @@ For a complete example see `example/custom_tree.gram`.
   IELR still first splits states by LR(1) context, and only takes this route when it still conflicts after splitting.
 - **`lr0` / `lr1` are exceptions and never abort in any circumstance**: these two modes exist precisely to lay bare the "grammar is not strong
   enough" situation; unresolved conflicts are only written into the report's `[未消解冲突]`, and the table entries continue to be written with the yacc default
-  (shift preferred) (see [LR(0) / LR(1) Canonical Automaton Modes](../13-modes.md#lr0--lr1-规范自动机模式)).
+  (shift preferred) (see [LR(0) / LR(1) Canonical Automaton Modes](../12-modes.md#lr0--lr1-规范自动机模式)).
 - **`slr` / `lalr` / `ielr` only let it pass when teaching mode is on (`%teach` / `--teach`)**: then they
   do not abort on unresolved conflicts, only record clearly in the report that "the grammar is not an X grammar" together with the conflict list, and continue generating table entries with
   shift preferred. Without `%teach` these three modes are strict: an unresolved conflict is an immediate error and
@@ -492,7 +492,7 @@ the broken fragment and keep parsing** (reporting several errors in one parse), 
 - **A single parse reports at most `PARSER_MAX_ERRORS` (8) errors**: fetch them one by one with `Parser_GetErrorCount()` /
   `Parser_GetError(index)`; `Parser_GetLastError()` is still the last one. When errors were reported during recovery
   but the parse ultimately succeeds, the return value is still `PARSER_OK` and the result may be incomplete; the caller uses
-  `Parser_GetErrorCount()` to decide whether to trust it (see [the API of the generated code](../14-languages-and-products.md#生成代码的-api)).
+  `Parser_GetErrorCount()` to decide whether to trust it (see [the API of the generated code](../13-languages-and-products.md#生成代码的-api)).
 - **Capacity macros can be set in the grammar**: `%max_errors N` / `%error_recovery_tokens N` (and
   `%max_stack_depth N`) change the value that the artifact's `#ifndef` falls back to; a compile-time `-D` still takes precedence.
 - **Semantic values dropped by popping are cleaned up by the user**: when `%union` is written, prefer `%destructor <member> { ... }`
@@ -755,4 +755,4 @@ lepus run out/lepus/parser.lep
 
 Write semantic actions and user code sections in Lepus. Use `$$` for the result and `$n` for a one-based right-hand-side value. The default semantic type is `float64`. Use `%value_type` to choose another Lepus type. `%trivia keep` preserves comment text and offsets. Use `%postlex` to process individual tokens or `%posttokens include "token_filter.lep"` to transform the whole sequence before parsing.
 
-See the [mode matrix](15-language-mode-support.md), the [generated API](08-generated-code.md#generated-lepus-api), and the [Lepus backend reference](../17-lepus-backend.md).
+See the [mode matrix](14-language-mode-support.md), the [generated API](08-generated-code.md#generated-lepus-api), and the [Lepus backend reference](../23-lepus-backend.md).
